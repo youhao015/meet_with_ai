@@ -7,19 +7,21 @@ interface BottomNavBarProps {
   activeTab: NavTab;
   onChangeTab: (tab: NavTab) => void;
   isRecording?: boolean;
+  isSummarizing?: boolean;
 }
 
 export const BottomNavBar: React.FC<BottomNavBarProps> = ({
   activeTab,
   onChangeTab,
-  isRecording = false
+  isRecording = false,
+  isSummarizing = false
 }) => {
   const tabs = [
     {
       id: 'studio' as NavTab,
       label: 'Studio',
       icon: Mic,
-      badge: isRecording ? 'REC' : undefined
+      badge: isRecording ? 'REC' : isSummarizing ? 'AI…' : undefined
     },
     {
       id: 'vault' as NavTab,
@@ -44,25 +46,32 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
-          const isDisabled = isRecording && tab.id !== 'studio';
+          const isLocked = (isRecording || isSummarizing) && tab.id !== 'studio';
+
+          let tabTooltip = tab.label;
+          if (isRecording && tab.id !== 'studio') {
+            tabTooltip = 'Recording in progress. Please stop recording before switching tabs.';
+          } else if (isSummarizing && tab.id !== 'studio') {
+            tabTooltip = 'AI is summarizing your meeting. Please wait until processing completes.';
+          }
 
           return (
             <button
               key={tab.id}
               onClick={() => {
-                if (isDisabled) return;
+                if (isLocked) return;
                 onChangeTab(tab.id);
               }}
-              disabled={isDisabled}
+              disabled={isLocked}
               className={`ios-dock-tab ${isActive ? 'active' : ''}`}
               role="tab"
               aria-selected={isActive}
               aria-label={tab.label}
-              title={isDisabled ? 'Recording in progress. Please stop recording before switching tabs.' : tab.label}
+              title={tabTooltip}
               style={{
-                opacity: isDisabled ? 0.38 : 1,
-                cursor: isDisabled ? 'not-allowed' : 'pointer',
-                filter: isDisabled ? 'grayscale(0.6)' : 'none',
+                opacity: isLocked ? 0.38 : 1,
+                cursor: isLocked ? 'not-allowed' : 'pointer',
+                filter: isLocked ? 'grayscale(0.6)' : 'none',
                 transition: 'all 0.2s ease'
               }}
             >

@@ -17,6 +17,7 @@ function AppShell() {
   const [currentTitle, setCurrentTitle] = useState<string>('');
   const [currentTranscript, setCurrentTranscript] = useState<string>('');
   const [isRecording, setIsRecording] = useState<boolean>(false);
+  const [isSummarizing, setIsSummarizing] = useState<boolean>(false);
 
   const handleSummaryGenerated = (
     result: SummarizeResult,
@@ -88,6 +89,7 @@ function AppShell() {
               <AudioCapturePanel
                 onSummaryGenerated={handleSummaryGenerated}
                 onRecordingStateChange={setIsRecording}
+                onSummarizingStateChange={setIsSummarizing}
               />
             )}
           </>
@@ -110,8 +112,9 @@ function AppShell() {
       <BottomNavBar
         activeTab={activeTab}
         isRecording={isRecording}
+        isSummarizing={isSummarizing}
         onChangeTab={(tab) => {
-          if (isRecording && tab !== 'studio') {
+          if ((isRecording || isSummarizing) && tab !== 'studio') {
             return;
           }
           setActiveTab(tab);

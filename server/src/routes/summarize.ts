@@ -14,10 +14,6 @@ interface SummaryResult {
   }>;
 }
 
-/**
- * Ordered list of free OpenRouter models to try.
- * Falls back to the next model if rate-limited or context-length exceeded.
- */
 const FREE_MODELS = [
   'meta-llama/llama-3.2-3b-instruct:free',
   'meta-llama/llama-3.1-8b-instruct:free',
@@ -29,7 +25,7 @@ const OPENROUTER_API = 'https://openrouter.ai/api/v1/chat/completions';
 const SITE_URL = process.env.SITE_URL || 'http://localhost:5173';
 const SITE_NAME = 'MeetWithAI';
 
-// ── Heuristic fallback (zero external deps) ──────────────────────────────────
+// ── Heuristic fallback ────────────────────────────────────────────────────────
 
 function heuristicSummarize(transcript: string, title?: string): SummaryResult {
   const lines = transcript
@@ -85,28 +81,99 @@ function heuristicSummarize(transcript: string, title?: string): SummaryResult {
   };
 }
 
-// ── Build the summarize prompt ────────────────────────────────────────────────
+// ── Build prompt ──────────────────────────────────────────────────────────────
 
 function buildPrompt(transcript: string, title: string): string {
-  return `You are an expert AI executive meeting summarizer.
-Analyze the following transcript and output ONLY valid JSON (no markdown, no code fences) matching this structure exactly:
+  return `You are an expert executive meeting assistant.
+Analyze the following meeting transcript and produce a structured, high-value executive summary.
+Respond ONLY with a valid JSON object matching this schema exactly:
 {
-  "overview": "Concise executive overview (2-3 sentences)",
-  "key_points": ["Discussion point 1", "Discussion point 2"],
-  "decisions": ["Decision 1", "Decision 2"],
+  "overview": "Concise executive overview (2-4 clear sentences highlighting the main purpose, tone, and final conclusion)",
+  "key_points": ["Key discussion point 1", "Key discussion point 2"],
+  "decisions": ["Final decision or agreement 1", "Final decision 2"],
   "action_items": [
-    { "task": "Actionable task", "assignee": "Person or Team", "due_date": "YYYY-MM-DD or timeframe" }
+    {
+      "task": "Concrete actionable task description",
+      "assignee": "Person, role, or team responsible",
+      "due_date": "Target date or timeframe if mentioned, otherwise leave as Ongoing or Soon"
+    }
   ]
 }
 
 Meeting Title: "${title}"
 Transcript:
 """
-${transcript.slice(0, 15_000)}
+${transcript.slice(0, 100_000)}
 """`;
 }
 
-// ── Try OpenRouter with model fallbacks ──────────────────────────────────────
+// ── Call Gemini AI ────────────────────────────────────────────────────────────
+
+async function callGemini(
+  apiKey: string,
+  transcript: string,
+  title: string
+): Promise<{ summary: SummaryResult; modelUsed: string }> {
+  const GEMINI_MODELS = [
+    'gemini-flash-latest',
+    'gemini-3.5-flash',
+    'gemini-3.7-flash',
+    'gemini-3.5-flash-lite',
+    'gemini-3.8-flash'
+  ];
+
+  const prompt = buildPrompt(transcript, title);
+  let lastError = '';
+
+  for (const model of GEMINI_MODELS) {
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              role: 'user',
+              parts: [{ text: prompt }]
+            }
+          ],
+          generationConfig: {
+            responseMimeType: 'application/json',
+            temperature: 0.2
+          }
+        })
+      });
+
+      if (!res.ok) {
+        const errText = await res.text();
+        console.warn(`[Gemini] ${model} returned ${res.status}: ${errText}. Trying next model…`);
+        lastError = `Gemini API error ${res.status}: ${errText}`;
+        continue;
+      }
+
+      const data = (await res.json()) as any;
+      const rawText: string = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+
+      const clean = rawText
+        .replace(/^```(?:json)?\s*/i, '')
+        .replace(/\s*```\s*$/i, '')
+        .trim();
+
+      const parsed = JSON.parse(clean) as SummaryResult;
+      return { summary: parsed, modelUsed: model };
+    } catch (err: any) {
+      lastError = err.message;
+      console.warn(`[Gemini] Model ${model} failed:`, err.message);
+    }
+  }
+
+  throw new Error(`All Gemini models failed: ${lastError}`);
+}
+
+// ── Try OpenRouter with fallback ──────────────────────────────────────────────
 
 async function callOpenRouter(
   apiKey: string,
@@ -134,22 +201,18 @@ async function callOpenRouter(
         })
       });
 
-      // Rate limited or server error — try next model
       if (res.status === 429 || res.status >= 500) {
         console.warn(`[OpenRouter] Model ${model} returned ${res.status}, trying next…`);
         continue;
       }
 
       if (!res.ok) {
-        const errText = await res.text();
-        console.warn(`[OpenRouter] Model ${model} error:`, errText);
         continue;
       }
 
       const data = (await res.json()) as any;
       const content: string = data.choices?.[0]?.message?.content ?? '';
 
-      // Strip markdown fences if model ignored the instruction
       const clean = content
         .replace(/^```(?:json)?\s*/i, '')
         .replace(/\s*```\s*$/i, '')
@@ -159,15 +222,13 @@ async function callOpenRouter(
         const parsed = JSON.parse(clean) as SummaryResult;
         return { summary: parsed, modelUsed: model };
       } catch {
-        // JSON parse failed — try extracting JSON block
         const match = clean.match(/\{[\s\S]*\}/);
         if (match) {
           return { summary: JSON.parse(match[0]) as SummaryResult, modelUsed: model };
         }
-        console.warn(`[OpenRouter] Model ${model} returned invalid JSON, trying next…`);
       }
-    } catch (fetchErr) {
-      console.warn(`[OpenRouter] Network error with model ${model}:`, fetchErr);
+    } catch {
+      // try next
     }
   }
 
@@ -184,23 +245,33 @@ router.post('/', async (req: Request, res: Response) => {
   }
 
   const meetingTitle = (title ?? 'Meeting').slice(0, 200);
-  const apiKey = process.env.OPENROUTER_API_KEY;
+  const geminiApiKey = process.env.GEMINI_API_KEY;
+  const openRouterApiKey = process.env.OPENROUTER_API_KEY;
 
-  // No API key → graceful offline heuristic fallback
-  if (!apiKey) {
-    console.info('[Summarize] No OPENROUTER_API_KEY — using heuristic fallback.');
-    const summary = heuristicSummarize(transcript, meetingTitle);
-    return res.json({ provider: 'heuristic-fallback', summary });
+  // 1. Primary: Gemini AI (Fast, 1M+ tokens, structured JSON mode)
+  if (geminiApiKey) {
+    try {
+      const { summary, modelUsed } = await callGemini(geminiApiKey, transcript, meetingTitle);
+      return res.json({ provider: `gemini/${modelUsed}`, summary });
+    } catch (err: any) {
+      console.warn('[Summarize] Gemini AI encountered an error, falling back to secondary:', err.message);
+    }
   }
 
-  try {
-    const { summary, modelUsed } = await callOpenRouter(apiKey, transcript, meetingTitle);
-    return res.json({ provider: `openrouter/${modelUsed}`, summary });
-  } catch (err: any) {
-    console.error('[Summarize] OpenRouter failed, falling back to heuristic:', err.message);
-    const summary = heuristicSummarize(transcript, meetingTitle);
-    return res.json({ provider: 'heuristic-fallback', summary });
+  // 2. Secondary: OpenRouter
+  if (openRouterApiKey) {
+    try {
+      const { summary, modelUsed } = await callOpenRouter(openRouterApiKey, transcript, meetingTitle);
+      return res.json({ provider: `openrouter/${modelUsed}`, summary });
+    } catch (err: any) {
+      console.warn('[Summarize] OpenRouter failed, falling back to heuristic:', err.message);
+    }
   }
+
+  // 3. Graceful offline heuristic fallback
+  console.info('[Summarize] Using heuristic fallback.');
+  const summary = heuristicSummarize(transcript, meetingTitle);
+  return res.json({ provider: 'heuristic-fallback', summary });
 });
 
 export default router;

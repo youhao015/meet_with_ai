@@ -21,11 +21,13 @@ import { transcribeAudioWithWhisper } from '../services/transcription';
 interface AudioCapturePanelProps {
   onSummaryGenerated: (result: SummarizeResult, meetingTitle: string, transcript: string) => void;
   onRecordingStateChange?: (isRecording: boolean) => void;
+  onSummarizingStateChange?: (isSummarizing: boolean) => void;
 }
 
 export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
   onSummaryGenerated,
-  onRecordingStateChange
+  onRecordingStateChange,
+  onSummarizingStateChange
 }) => {
   const [meetingTitle, setMeetingTitle] = useState('');
   const [isSummarizing, setIsSummarizing] = useState(false);
@@ -70,6 +72,11 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
       document.title = 'MeetWithAI';
     }
   }, [isRecording, onRecordingStateChange]);
+
+  // Notify parent of summarization status to lock tabs while AI is generating
+  useEffect(() => {
+    onSummarizingStateChange?.(isSummarizing);
+  }, [isSummarizing, onSummarizingStateChange]);
 
   const handleStartCapture = async (mode: 'mic' | 'system') => {
     try {
