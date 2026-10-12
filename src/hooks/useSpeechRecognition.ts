@@ -10,6 +10,23 @@ interface SpeechRecognitionEvent extends Event {
   results: SpeechRecognitionResultList;
 }
 
+interface ISpeechRecognition extends EventTarget {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  maxAlternatives: number;
+  onaudiostart: (() => void) | null;
+  onaudioend: (() => void) | null;
+  onresult: ((event: SpeechRecognitionEvent) => void) | null;
+  onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+  abort: () => void;
+}
+
+type ISpeechRecognitionConstructor = new () => ISpeechRecognition;
+
 export interface UseSpeechRecognitionReturn {
   isListening: boolean;
   transcript: string;
@@ -36,7 +53,8 @@ export function useSpeechRecognition(): UseSpeechRecognitionReturn {
     return Boolean(w.SpeechRecognition || w.webkitSpeechRecognition);
   });
 
-  const activeSessionRef = useRef<any>(null);
+  const activeSessionRef = useRef<ISpeechRecognition | null>(null);
+  const sessionRunnerRef = useRef<() => void>(() => {});
   const shouldListenRef = useRef(false);
   const transcriptRef = useRef('');
   const interimTranscriptRef = useRef('');
@@ -72,7 +90,10 @@ export function useSpeechRecognition(): UseSpeechRecognitionReturn {
   const startRecognitionSession = useCallback(() => {
     if (!shouldListenRef.current || typeof window === 'undefined') return;
 
-    const w = window as unknown as { SpeechRecognition?: any; webkitSpeechRecognition?: any };
+    const w = window as unknown as {
+      SpeechRecognition?: ISpeechRecognitionConstructor;
+      webkitSpeechRecognition?: ISpeechRecognitionConstructor;
+    };
     const SR = w.SpeechRecognition || w.webkitSpeechRecognition;
     if (!SR) return;
 
@@ -174,7 +195,7 @@ export function useSpeechRecognition(): UseSpeechRecognitionReturn {
           // Resilient restart after 60ms pause
           restartTimerRef.current = setTimeout(() => {
             if (shouldListenRef.current) {
-              startRecognitionSession();
+              sessionRunnerRef.current();
             }
           }, 60);
         } else {
@@ -192,12 +213,16 @@ export function useSpeechRecognition(): UseSpeechRecognitionReturn {
         clearRestartTimer();
         restartTimerRef.current = setTimeout(() => {
           if (shouldListenRef.current) {
-            startRecognitionSession();
+            sessionRunnerRef.current();
           }
         }, 250);
       }
     }
   }, [flushInterimToTranscript]);
+
+  useEffect(() => {
+    sessionRunnerRef.current = startRecognitionSession;
+  }, [startRecognitionSession]);
 
   const startListening = useCallback(() => {
     if (!isSupported) return;

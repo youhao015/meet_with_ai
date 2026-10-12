@@ -26,9 +26,14 @@ export const SettingsView: React.FC = () => {
     const detectGpu = async () => {
       if (typeof navigator !== 'undefined' && 'gpu' in navigator) {
         try {
-          const adapter = await (navigator as any).gpu.requestAdapter();
+          const navGpu = (navigator as unknown as {
+            gpu?: {
+              requestAdapter: () => Promise<{ info?: { vendor?: string; architecture?: string } } | null>;
+            };
+          }).gpu;
+          const adapter = await navGpu?.requestAdapter();
           if (adapter) {
-            const info = (adapter as any).info;
+            const info = adapter.info;
             setGpuInfo(info?.vendor || info?.architecture || 'WebGPU Compatible Adapter');
           } else {
             setGpuInfo('Default WebGPU Engine');

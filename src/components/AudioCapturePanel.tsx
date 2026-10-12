@@ -88,12 +88,14 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
       if (isSpeechSupported) {
         startListening();
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       stopListening();
-      if (err.name === 'NotAllowedError' || err.message?.toLowerCase().includes('permission denied')) {
+      const errorObj = err instanceof Error ? err : null;
+      const errorMsg = errorObj?.message || String(err || '');
+      if (errorObj?.name === 'NotAllowedError' || errorMsg.toLowerCase().includes('permission denied')) {
         setErrorMessage('Microphone access was blocked. Please click the permissions icon in your browser address bar to allow Microphone, or type/paste notes below.');
       } else {
-        setErrorMessage(`Failed to start recording: ${err.message || 'Permission denied'}`);
+        setErrorMessage(`Failed to start recording: ${errorMsg || 'Permission denied'}`);
       }
     }
   };
@@ -127,9 +129,10 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
       } else {
         setErrorMessage('Whisper returned an empty transcription. Try speaking closer to the microphone.');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('[Whisper Transcription Error]:', err);
-      setErrorMessage(`Whisper transcription failed: ${err.message || 'Check server connection.'}`);
+      const errMsg = err instanceof Error ? err.message : String(err || '');
+      setErrorMessage(`Whisper transcription failed: ${errMsg || 'Check server connection.'}`);
     } finally {
       setIsTranscribing(false);
     }
@@ -203,9 +206,10 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
       }
 
       onSummaryGenerated(result, displayTitle, textToSummarize);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Summarization failure:', err);
-      setErrorMessage(`Summarization failed: ${err.message || 'Unknown error'}`);
+      const errMsg = err instanceof Error ? err.message : String(err || '');
+      setErrorMessage(`Summarization failed: ${errMsg || 'Unknown error'}`);
     } finally {
       setIsSummarizing(false);
     }

@@ -11,6 +11,13 @@ import {
 } from 'lucide-react';
 import type { SummarizeResult } from '../services/summarizer';
 
+interface ActionItemWithStatus {
+  task: string;
+  assignee: string;
+  due_date?: string;
+  status?: 'pending' | 'completed';
+}
+
 interface MeetingSummaryViewProps {
   result: SummarizeResult;
   title: string;
@@ -21,11 +28,11 @@ interface MeetingSummaryViewProps {
 export const MeetingSummaryView: React.FC<MeetingSummaryViewProps> = ({
   result,
   title,
-  transcript: _transcript,
+  transcript,
   onBack
 }) => {
   const [copied, setCopied] = useState(false);
-  const [actionItems, setActionItems] = useState(result.summary.action_items || []);
+  const [actionItems, setActionItems] = useState<ActionItemWithStatus[]>(result.summary.action_items || []);
 
   const toggleTaskStatus = (index: number) => {
     setActionItems((prev) =>
@@ -33,7 +40,7 @@ export const MeetingSummaryView: React.FC<MeetingSummaryViewProps> = ({
         i === index
           ? {
               ...item,
-              status: (item as any).status === 'completed' ? 'pending' : 'completed'
+              status: item.status === 'completed' ? 'pending' : 'completed'
             }
           : item
       )
@@ -55,7 +62,7 @@ ${(result.summary.decisions || []).map((d) => `- ${d}`).join('\n')}
 
 ## Action Items
 ${actionItems.map((a) => `- [ ] **${a.task}** (Assignee: ${a.assignee || 'Unassigned'}, Due: ${a.due_date || 'N/A'})`).join('\n')}
-`;
+${transcript ? `\n## Transcript\n${transcript}\n` : ''}`;
     navigator.clipboard.writeText(markdown);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -185,7 +192,7 @@ ${actionItems.map((a) => `- [ ] **${a.task}** (Assignee: ${a.assignee || 'Unassi
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {actionItems.map((item, idx) => {
-              const isDone = (item as any).status === 'completed';
+              const isDone = item.status === 'completed';
               return (
                 <div
                   key={idx}

@@ -29,19 +29,32 @@ let engineInstance: MLCEngineInterface | null = null;
 let currentLoadedModel: string | null = null;
 let engineWorker: Worker | null = null;
 
+interface NavigatorWithGPU extends Navigator {
+  gpu?: {
+    requestAdapter: () => Promise<{
+      limits?: {
+        maxBufferSize?: number;
+      };
+    } | null>;
+  };
+}
+
 export function checkWebGPUSupport(): boolean {
-  return typeof navigator !== 'undefined' && 'gpu' in navigator && !!navigator.gpu;
+  if (typeof navigator === 'undefined') return false;
+  const nav = navigator as NavigatorWithGPU;
+  return Boolean('gpu' in nav && nav.gpu);
 }
 
 /** Check if system likely has enough VRAM/memory for local inference */
 export async function checkGPUMemory(): Promise<boolean> {
   if (!checkWebGPUSupport()) return false;
   try {
-    const adapter = await navigator.gpu.requestAdapter();
-    if (!adapter) return false;
+    const nav = navigator as NavigatorWithGPU;
+    const adapter = await nav.gpu?.requestAdapter();
+    if (!adapter?.limits) return false;
     // Most adapters with limits > 512MB should handle 1B models
     const limits = adapter.limits;
-    return limits.maxBufferSize >= 512 * 1024 * 1024;
+    return (limits.maxBufferSize ?? 0) >= 512 * 1024 * 1024;
   } catch {
     return false;
   }
@@ -133,12 +146,13 @@ export async function summarizeWithWebLLM(
         const content = reply.choices[0]?.message?.content || '{}';
         return parseJsonSummary(content);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : String(err || '');
       const isOOM =
-        err?.message?.toLowerCase().includes('out of memory') ||
-        err?.message?.toLowerCase().includes('oom') ||
-        err?.message?.toLowerCase().includes('memory') ||
-        err?.message?.toLowerCase().includes('webgpu');
+        errMsg.toLowerCase().includes('out of memory') ||
+        errMsg.toLowerCase().includes('oom') ||
+        errMsg.toLowerCase().includes('memory') ||
+        errMsg.toLowerCase().includes('webgpu');
 
       if (isOOM && modelId !== FALLBACK_MODEL) {
         console.warn(`[WebLLM] OOM with ${modelId}, releasing engine and trying ${FALLBACK_MODEL}...`);

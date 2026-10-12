@@ -22,7 +22,7 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
-  const timerRef = useRef<any>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -46,7 +46,10 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
 
   const startAnalysis = useCallback((stream: MediaStream) => {
     try {
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      const AudioCtx =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!AudioCtx) return;
       const ctx = new AudioCtx();
       const analyser = ctx.createAnalyser();
       analyser.fftSize = 64;
@@ -141,7 +144,10 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
             });
             micStreamRef.current = micStream;
 
-            const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+            const AudioCtx =
+              window.AudioContext ||
+              (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+            if (!AudioCtx) throw new Error('AudioContext unsupported');
             const mixContext = new AudioCtx();
             mixAudioContextRef.current = mixContext;
             const destination = mixContext.createMediaStreamDestination();
@@ -261,7 +267,7 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
       setIsRecording(false);
       throw err;
     }
-  }, [audioUrl, startAnalysis, cleanupAudioAnalysis, stopRecording]);
+  }, [audioUrl, startAnalysis, cleanupAudioAnalysis]);
 
   const resetRecording = useCallback(() => {
     stopRecording();

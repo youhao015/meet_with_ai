@@ -227,8 +227,9 @@ export async function summarizeMeeting(options: SummarizeOptions): Promise<Summa
       const audioUrl = await audioUrlPromise;
       return { summary, tierUsed, audioUrl, provider };
     }
-  } catch (cloudErr: any) {
-    console.warn('[Tier 1] Cloud summarization unreachable:', cloudErr.message);
+  } catch (cloudErr: unknown) {
+    const errMsg = cloudErr instanceof Error ? cloudErr.message : String(cloudErr);
+    console.warn('[Tier 1] Cloud summarization unreachable:', errMsg);
     progress(`Connecting to local processing engine…`, 45);
   }
 
@@ -238,8 +239,9 @@ export async function summarizeMeeting(options: SummarizeOptions): Promise<Summa
     progress('Local processing complete ✓', 100);
     const audioUrl = await audioUrlPromise;
     return { summary, tierUsed: 'local-webgpu', audioUrl };
-  } catch (localErr: any) {
-    console.warn('[Tier 2] Local WebGPU unavailable, applying structured parser:', localErr.message);
+  } catch (localErr: unknown) {
+    const errMsg = localErr instanceof Error ? localErr.message : String(localErr);
+    console.warn('[Tier 2] Local WebGPU unavailable, applying structured parser:', errMsg);
   }
 
   // ── Tier 3 (Failsafe): In-Browser Structured Parser ──────────────────────

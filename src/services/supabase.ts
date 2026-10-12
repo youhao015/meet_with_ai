@@ -55,8 +55,14 @@ export async function fetchMeetings(): Promise<MeetingRecord[]> {
   return data || [];
 }
 
+export type ActionItemInput = {
+  task: string;
+  assignee?: string;
+  due_date?: string;
+};
+
 // Save meeting and action items
-export async function saveMeetingWithItems(meeting: Partial<MeetingRecord>, actionItems?: any[]): Promise<MeetingRecord | null> {
+export async function saveMeetingWithItems(meeting: Partial<MeetingRecord>, actionItems?: ActionItemInput[]): Promise<MeetingRecord | null> {
   const { data: { user } } = await supabase.auth.getUser();
 
   const { data: savedMeeting, error } = await supabase

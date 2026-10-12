@@ -5,7 +5,7 @@ export interface AuthenticatedRequest extends Request {
   user?: {
     id: string;
     email?: string;
-    user_metadata?: Record<string, any>;
+    user_metadata?: Record<string, unknown>;
   };
 }
 
@@ -20,7 +20,7 @@ export async function requireAuth(req: AuthenticatedRequest, res: Response, next
 
     req.user = user;
     next();
-  } catch (err) {
+  } catch {
     return res.status(500).json({ error: 'Authentication verification failure' });
   }
 }
