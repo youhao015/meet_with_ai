@@ -252,6 +252,12 @@ export function useSpeechRecognition(): UseSpeechRecognitionReturn {
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [flushInterimToTranscript, startRecognitionSession]);
+
+  // Teardown only on complete unmount of the hook
+  useEffect(() => {
+    return () => {
       shouldListenRef.current = false;
       clearRestartTimer();
       if (activeSessionRef.current) {
@@ -262,7 +268,7 @@ export function useSpeechRecognition(): UseSpeechRecognitionReturn {
         }
       }
     };
-  }, [flushInterimToTranscript, startRecognitionSession]);
+  }, []);
 
   return {
     isListening,

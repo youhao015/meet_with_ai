@@ -16,6 +16,7 @@ function AppShell() {
   const [currentSummaryResult, setCurrentSummaryResult] = useState<SummarizeResult | null>(null);
   const [currentTitle, setCurrentTitle] = useState<string>('');
   const [currentTranscript, setCurrentTranscript] = useState<string>('');
+  const [isRecording, setIsRecording] = useState<boolean>(false);
 
   const handleSummaryGenerated = (
     result: SummarizeResult,
@@ -68,6 +69,7 @@ function AppShell() {
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', position: 'relative' }}>
       <IOSHeader
         title={getHeaderTitle()}
+        isRecording={isRecording}
         onNewMeeting={handleNewMeeting}
       />
 
@@ -83,7 +85,10 @@ function AppShell() {
                 onBack={() => setCurrentSummaryResult(null)}
               />
             ) : (
-              <AudioCapturePanel onSummaryGenerated={handleSummaryGenerated} />
+              <AudioCapturePanel
+                onSummaryGenerated={handleSummaryGenerated}
+                onRecordingStateChange={setIsRecording}
+              />
             )}
           </>
         )}
@@ -104,7 +109,11 @@ function AppShell() {
       {/* iOS Floating Bottom Glass Dock */}
       <BottomNavBar
         activeTab={activeTab}
+        isRecording={isRecording}
         onChangeTab={(tab) => {
+          if (isRecording && tab !== 'studio') {
+            return;
+          }
           setActiveTab(tab);
           if (tab !== 'studio') {
             setCurrentSummaryResult(null);

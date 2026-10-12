@@ -7,7 +7,8 @@ import {
   RefreshCw,
   Play,
   RotateCcw,
-  FileText
+  FileText,
+  Wand2
 } from 'lucide-react';
 import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
 import { useAudioRecorder } from '../hooks/useAudioRecorder';
@@ -15,12 +16,17 @@ import { AudioVisualizer } from './AudioVisualizer';
 import { PipelineStatus } from './PipelineStatus';
 import { summarizeMeeting, type SummarizeResult } from '../services/summarizer';
 import { saveMeetingWithItems } from '../services/supabase';
+import { transcribeAudioWithWhisper } from '../services/transcription';
 
 interface AudioCapturePanelProps {
   onSummaryGenerated: (result: SummarizeResult, meetingTitle: string, transcript: string) => void;
+  onRecordingStateChange?: (isRecording: boolean) => void;
 }
 
-export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({ onSummaryGenerated }) => {
+export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
+  onSummaryGenerated,
+  onRecordingStateChange
+}) => {
   const [meetingTitle, setMeetingTitle] = useState('');
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [progressText, setProgressText] = useState<string>('');
@@ -28,6 +34,7 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({ onSummaryG
   const [streamingTokens, setStreamingTokens] = useState<string>('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [activeTier, setActiveTier] = useState<'cloud' | 'local-webgpu' | 'heuristic' | null>(null);
+  const [isTranscribing, setIsTranscribing] = useState(false);
 
   const {
     isListening,
@@ -56,12 +63,13 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({ onSummaryG
 
   // Keep browser tab title updated so background recording is clearly visible
   useEffect(() => {
+    onRecordingStateChange?.(isRecording);
     if (isRecording) {
       document.title = '🔴 Recording... · MeetWithAI';
     } else {
       document.title = 'MeetWithAI';
     }
-  }, [isRecording]);
+  }, [isRecording, onRecordingStateChange]);
 
   const handleStartCapture = async (mode: 'mic' | 'system') => {
     try {
@@ -87,6 +95,36 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({ onSummaryG
     stopRecording();
     if (isListening) {
       stopListening();
+    }
+  };
+
+  const handleTranscribeAudio = async (targetBlob?: Blob | null) => {
+    const blobToTranscribe = targetBlob || audioBlob;
+    if (!blobToTranscribe) {
+      setErrorMessage('No audio recording found to transcribe.');
+      return;
+    }
+
+    try {
+      setIsTranscribing(true);
+      setErrorMessage(null);
+      setProgressText('Transcribing audio with Whisper AI…');
+      setProgressPercent(45);
+
+      const response = await transcribeAudioWithWhisper(blobToTranscribe);
+      if (response.text) {
+        setTranscript(response.text);
+        setProgressText('Transcription complete! Ready to generate summary.');
+        setProgressPercent(100);
+        setTimeout(() => setProgressPercent(0), 2000);
+      } else {
+        setErrorMessage('Whisper returned an empty transcription. Try speaking closer to the microphone.');
+      }
+    } catch (err: any) {
+      console.error('[Whisper Transcription Error]:', err);
+      setErrorMessage(`Whisper transcription failed: ${err.message || 'Check server connection.'}`);
+    } finally {
+      setIsTranscribing(false);
     }
   };
 
@@ -314,6 +352,28 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({ onSummaryG
           </button>
         </div>
 
+        {/* Earphone Notice for Meetings */}
+        {!isRecording && (
+          <div style={{
+            marginTop: '16px',
+            padding: '10px 16px',
+            borderRadius: '12px',
+            background: 'rgba(99, 102, 241, 0.06)',
+            border: '1px solid rgba(99, 102, 241, 0.18)',
+            fontSize: '12.5px',
+            color: 'var(--text-secondary)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            lineHeight: 1.5
+          }}>
+            <span style={{ fontSize: '16px' }}>🎧</span>
+            <span>
+              <strong>Attending a meeting with earphones?</strong> Click <strong>Record Screen / Tab Audio</strong> (select your meeting tab and check <em>"Also share tab audio"</em>). In-Room Mic only hears room air, so it cannot hear voices inside your earphones.
+            </span>
+          </div>
+        )}
+
         {/* Tab/Screen Audio Guidance Notice when recording system audio */}
         {isRecording && captureMode === 'system' && (
           <div style={{
@@ -342,16 +402,52 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({ onSummaryG
             borderRadius: '12px',
             display: 'flex',
             alignItems: 'center',
+            justifyContent: 'space-between',
             gap: '12px',
             flexWrap: 'wrap'
           }}>
-            <Play size={16} color="var(--accent-primary)" />
-            <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Session Audio:</span>
-            <audio src={audioUrl} controls style={{ height: '32px', flex: 1, minWidth: '220px', outline: 'none' }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: '240px' }}>
+              <Play size={16} color="var(--accent-primary)" />
+              <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Session Audio:</span>
+              <audio src={audioUrl} controls style={{ height: '32px', flex: 1, minWidth: '180px', outline: 'none' }} />
+            </div>
+
+            <button
+              id="btn-transcribe-whisper"
+              onClick={() => handleTranscribeAudio()}
+              disabled={isTranscribing}
+              className="btn-secondary"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontSize: '13px',
+                fontWeight: 600,
+                color: 'var(--accent-primary)',
+                background: 'rgba(99, 102, 241, 0.1)',
+                border: '1px solid rgba(99, 102, 241, 0.25)',
+                padding: '8px 14px',
+                borderRadius: '10px',
+                cursor: isTranscribing ? 'not-allowed' : 'pointer'
+              }}
+              title="Use Groq Whisper AI to transcribe all audio (captures in-room mic + remote meeting participants)"
+            >
+              {isTranscribing ? (
+                <>
+                  <RefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} />
+                  Transcribing with Whisper…
+                </>
+              ) : (
+                <>
+                  <Wand2 size={14} />
+                  Transcribe with Whisper AI
+                </>
+              )}
+            </button>
           </div>
         )}
 
-        {/* Notice if audio was recorded but no microphone text was transcribed */}
+        {/* Notice if audio was recorded */}
         {!isRecording && audioUrl && !transcript.trim() && (
           <div style={{
             marginTop: '14px',
@@ -363,9 +459,11 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({ onSummaryG
             color: 'var(--text-primary)',
             display: 'flex',
             alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
             gap: '10px'
           }}>
-            <span>Audio session recorded successfully! You can type or paste meeting notes below, then click <strong>Generate Summary</strong> to process.</span>
+            <span>Recording finished! Click <strong>Transcribe with Whisper AI</strong> above to convert the audio into text, or type notes below.</span>
           </div>
         )}
 

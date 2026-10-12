@@ -21,7 +21,7 @@ interface MeetingSummaryViewProps {
 export const MeetingSummaryView: React.FC<MeetingSummaryViewProps> = ({
   result,
   title,
-  transcript,
+  transcript: _transcript,
   onBack
 }) => {
   const [copied, setCopied] = useState(false);

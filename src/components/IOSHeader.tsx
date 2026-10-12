@@ -12,8 +12,7 @@ interface IOSHeaderProps {
 
 export const IOSHeader: React.FC<IOSHeaderProps> = ({
   title,
-  isRecording = false,
-  recordingSeconds = 0
+  isRecording = false
 }) => {
   const { theme, toggleTheme } = useTheme();
   const { user, logout } = useAuth();
@@ -29,12 +28,6 @@ export const IOSHeader: React.FC<IOSHeaderProps> = ({
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
-
-  const formatTimer = (sec: number) => {
-    const m = Math.floor(sec / 60);
-    const s = sec % 60;
-    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-  };
 
   const displayName = user?.user_metadata?.full_name
     || user?.user_metadata?.name
@@ -115,7 +108,7 @@ export const IOSHeader: React.FC<IOSHeaderProps> = ({
                 animation: 'pulse 1s infinite'
               }} />
               <span style={{ color: '#f43f5e', fontWeight: 700, letterSpacing: '0.4px' }}>
-                REC {formatTimer(recordingSeconds)}
+                REC
               </span>
               <Radio size={14} color="#f43f5e" />
             </div>

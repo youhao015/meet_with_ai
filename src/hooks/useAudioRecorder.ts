@@ -29,6 +29,8 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
   const animationFrameRef = useRef<number | null>(null);
 
   const displayStreamRef = useRef<MediaStream | null>(null);
+  const micStreamRef = useRef<MediaStream | null>(null);
+  const mixAudioContextRef = useRef<AudioContext | null>(null);
 
   const cleanupAudioAnalysis = useCallback(() => {
     if (animationFrameRef.current) {
@@ -79,6 +81,16 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
       mediaRecorderRef.current.stop();
     }
 
+    if (micStreamRef.current) {
+      micStreamRef.current.getTracks().forEach((track) => track.stop());
+      micStreamRef.current = null;
+    }
+
+    if (mixAudioContextRef.current && mixAudioContextRef.current.state !== 'closed') {
+      mixAudioContextRef.current.close().catch(() => {});
+      mixAudioContextRef.current = null;
+    }
+
     if (displayStreamRef.current) {
       displayStreamRef.current.getTracks().forEach((track) => track.stop());
       displayStreamRef.current = null;
@@ -117,9 +129,33 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
 
         const audioTracks = displayStream.getAudioTracks();
         if (audioTracks.length > 0) {
-          // MediaRecorder cannot record video streams with an audio MIME type.
-          // Extract only the audio tracks for the audio recorder and analyzer.
-          audioStreamToRecord = new MediaStream(audioTracks);
+          // Attempt to mix microphone with tab audio so both meeting attendees (in earphones)
+          // and user's microphone speech are cleanly recorded into one session
+          try {
+            const micStream = await navigator.mediaDevices.getUserMedia({
+              audio: {
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true
+              }
+            });
+            micStreamRef.current = micStream;
+
+            const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+            const mixContext = new AudioCtx();
+            mixAudioContextRef.current = mixContext;
+            const destination = mixContext.createMediaStreamDestination();
+
+            const tabSource = mixContext.createMediaStreamSource(new MediaStream(audioTracks));
+            const micSource = mixContext.createMediaStreamSource(micStream);
+            tabSource.connect(destination);
+            micSource.connect(destination);
+
+            audioStreamToRecord = destination.stream;
+          } catch {
+            // If mic access denied or busy, capture tab audio alone
+            audioStreamToRecord = new MediaStream(audioTracks);
+          }
         } else {
           // If the user selected a screen or window without checking audio,
           // gracefully fallback to microphone audio so recording succeeds
@@ -142,10 +178,11 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
           }
         }
 
-        // Detect user clicking the browser's floating "Stop sharing" button
+        // Note: Do not automatically kill the entire recording session if screen sharing ends.
+        // The user must explicitly click "Stop Recording" to end their session.
         displayStream.getVideoTracks().forEach((track) => {
           track.onended = () => {
-            stopRecording();
+            console.log('[AudioRecorder] Video share stream track ended; audio capture continues until user stops.');
           };
         });
       } else {

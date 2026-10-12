@@ -44,15 +44,27 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
+          const isDisabled = isRecording && tab.id !== 'studio';
 
           return (
             <button
               key={tab.id}
-              onClick={() => onChangeTab(tab.id)}
+              onClick={() => {
+                if (isDisabled) return;
+                onChangeTab(tab.id);
+              }}
+              disabled={isDisabled}
               className={`ios-dock-tab ${isActive ? 'active' : ''}`}
               role="tab"
               aria-selected={isActive}
               aria-label={tab.label}
+              title={isDisabled ? 'Recording in progress. Please stop recording before switching tabs.' : tab.label}
+              style={{
+                opacity: isDisabled ? 0.38 : 1,
+                cursor: isDisabled ? 'not-allowed' : 'pointer',
+                filter: isDisabled ? 'grayscale(0.6)' : 'none',
+                transition: 'all 0.2s ease'
+              }}
             >
               <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <Icon

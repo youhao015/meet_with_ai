@@ -4,6 +4,7 @@ import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import authRoutes from './routes/auth.js';
 import summarizeRoutes from './routes/summarize.js';
+import transcribeRoutes from './routes/transcribe.js';
 
 dotenv.config();
 
@@ -22,6 +23,7 @@ app.use(cors({
 // Route Mounts
 app.use('/auth', authRoutes);
 app.use('/api/summarize', summarizeRoutes);
+app.use('/api/transcribe', transcribeRoutes);
 
 // Health Check
 app.get('/api/health', (_req, res) => {
