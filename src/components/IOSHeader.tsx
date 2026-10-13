@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Sun, Moon, Sparkles, LogOut, ChevronDown, User, Radio } from 'lucide-react';
+import { Sun, Moon, LogOut, ChevronDown, User, Radio } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 

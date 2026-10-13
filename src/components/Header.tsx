@@ -1,4 +1,4 @@
-import { Cpu, Zap, Cloud, Sparkles, LogOut, ChevronDown, User } from 'lucide-react';
+import { Cpu, Zap, Cloud, LogOut, ChevronDown, User } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { checkWebGPUSupport } from '../services/webllm';
 import { useAuth } from '../context/AuthContext';
