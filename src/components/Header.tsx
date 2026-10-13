@@ -49,13 +49,29 @@ export function Header({ onNewMeeting, activeTab, setActiveTab }: HeaderProps) {
     }}>
       {/* Brand */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-        <div style={{
-          width: '38px', height: '38px', borderRadius: '11px',
-          background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: '0 4px 16px rgba(99,102,241,0.4)'
-        }}>
-          <Sparkles size={20} color="#ffffff" />
+        <div
+          className="shimmering-robot-container"
+          style={{
+            width: '38px',
+            height: '38px',
+            borderRadius: '12px',
+            background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.22) 0%, rgba(168, 85, 247, 0.22) 100%)',
+            border: '1px solid rgba(255, 255, 255, 0.16)',
+            boxShadow: '0 4px 18px rgba(99, 102, 241, 0.45)',
+            flexShrink: 0
+          }}
+        >
+          <img
+            src="/robot-icon.png"
+            alt="MeetWithAI Shimmering Robot"
+            className="shimmering-robot-img"
+            style={{
+              width: '31px',
+              height: '31px',
+              objectFit: 'contain'
+            }}
+          />
+          <div className="robot-shimmer-sweep" />
         </div>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>

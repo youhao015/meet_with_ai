@@ -12,7 +12,8 @@ interface IOSHeaderProps {
 
 export const IOSHeader: React.FC<IOSHeaderProps> = ({
   title,
-  isRecording = false
+  isRecording = false,
+  onNewMeeting
 }) => {
   const { theme, toggleTheme } = useTheme();
   const { user, logout } = useAuth();
@@ -64,19 +65,40 @@ export const IOSHeader: React.FC<IOSHeaderProps> = ({
         gap: '12px'
       }}>
         {/* Left: Brand Identity */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div style={{
-            width: '36px',
-            height: '36px',
-            borderRadius: '12px',
-            background: 'linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-purple) 100%)',
+        <div
+          onClick={onNewMeeting}
+          style={{
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: '0 4px 16px var(--accent-primary-glow)',
-            flexShrink: 0
-          }}>
-            <Sparkles size={18} color="#ffffff" />
+            gap: '10px',
+            cursor: onNewMeeting ? 'pointer' : 'default',
+            userSelect: 'none'
+          }}
+          title={onNewMeeting ? 'Go to Home / New Meeting' : undefined}
+        >
+          <div
+            className="shimmering-robot-container"
+            style={{
+              width: '38px',
+              height: '38px',
+              borderRadius: '12px',
+              background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.22) 0%, rgba(168, 85, 247, 0.22) 100%)',
+              border: '1px solid rgba(255, 255, 255, 0.16)',
+              boxShadow: '0 4px 18px var(--accent-primary-glow)',
+              flexShrink: 0
+            }}
+          >
+            <img
+              src="/robot-icon.png"
+              alt="MeetWithAI Shimmering Robot"
+              className="shimmering-robot-img"
+              style={{
+                width: '31px',
+                height: '31px',
+                objectFit: 'contain'
+              }}
+            />
+            <div className="robot-shimmer-sweep" />
           </div>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>

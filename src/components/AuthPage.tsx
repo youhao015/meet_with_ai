@@ -85,9 +85,30 @@ export function AuthPage() {
       </div>
 
       {/* Brand */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '40px' }}>
-        <div style={{ width: '46px', height: '46px', borderRadius: '14px', background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 6px 24px rgba(99,102,241,0.45)' }}>
-          <Sparkles size={24} color="#ffffff" />
+      <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '40px' }}>
+        <div
+          className="shimmering-robot-container"
+          style={{
+            width: '50px',
+            height: '50px',
+            borderRadius: '16px',
+            background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.25) 0%, rgba(168, 85, 247, 0.25) 100%)',
+            border: '1px solid rgba(255, 255, 255, 0.18)',
+            boxShadow: '0 8px 24px rgba(99, 102, 241, 0.45)',
+            flexShrink: 0
+          }}
+        >
+          <img
+            src="/robot-icon.png"
+            alt="MeetWithAI Shimmering Robot"
+            className="shimmering-robot-img"
+            style={{
+              width: '40px',
+              height: '40px',
+              objectFit: 'contain'
+            }}
+          />
+          <div className="robot-shimmer-sweep" />
         </div>
         <div>
           <span style={{ fontFamily: 'var(--font-heading)', fontSize: '24px', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.5px' }}>

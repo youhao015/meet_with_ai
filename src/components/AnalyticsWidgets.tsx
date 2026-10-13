@@ -308,24 +308,26 @@ export const AnalyticsWidgets: React.FC = () => {
                 Minutes recorded per day across your calendar
               </p>
             </div>
-            <span className="badge badge-source">
+            <span className="badge badge-source" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 8px #10b981' }} />
               7-Day Activity
             </span>
           </div>
 
-          {/* Interactive Bar Chart using Real Data */}
+          {/* Interactive Shimmering Bar Chart */}
           <div style={{
             display: 'flex',
             alignItems: 'flex-end',
             justifyContent: 'space-between',
-            height: '190px',
-            paddingTop: '26px',
+            height: '200px',
+            paddingTop: '20px',
+            paddingBottom: '6px',
             borderBottom: '1px solid var(--glass-border)'
           }}>
             {weeklyActivity.map((item, idx) => {
               const heightPercent = item.minutes > 0
-                ? Math.max((item.minutes / maxRecordedMinutes) * 100, 14)
-                : 6;
+                ? Math.max((item.minutes / maxRecordedMinutes) * 100, 16)
+                : 4;
               const isHovered = hoveredDay === idx;
 
               return (
@@ -337,7 +339,7 @@ export const AnalyticsWidgets: React.FC = () => {
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
-                    gap: '6px',
+                    gap: '8px',
                     flex: 1,
                     cursor: 'pointer',
                     position: 'relative'
@@ -347,51 +349,76 @@ export const AnalyticsWidgets: React.FC = () => {
                   {isHovered && (
                     <div style={{
                       position: 'absolute',
-                      top: '-42px',
+                      top: '-46px',
                       background: 'var(--island-bg)',
                       border: '1px solid var(--glass-border)',
-                      padding: '4px 8px',
+                      padding: '5px 10px',
                       borderRadius: '8px',
                       fontSize: '11px',
                       fontWeight: 600,
                       color: 'var(--text-primary)',
-                      boxShadow: 'var(--glass-shadow)',
+                      boxShadow: 'var(--glass-shadow-float)',
                       whiteSpace: 'nowrap',
-                      zIndex: 20
+                      zIndex: 30,
+                      pointerEvents: 'none'
                     }}>
                       {item.dateStr}: {item.minutes}m ({item.count} session{item.count !== 1 ? 's' : ''})
                     </div>
                   )}
 
-                  {/* Value label on top of bar */}
+                  {/* Value badge pill on top of bar track */}
                   <span style={{
                     fontSize: '11px',
-                    fontWeight: 600,
-                    color: item.minutes > 0 ? 'var(--text-primary)' : 'var(--text-muted)'
+                    fontWeight: 700,
+                    padding: '2px 6px',
+                    borderRadius: '6px',
+                    background: item.minutes > 0 ? 'rgba(99, 102, 241, 0.12)' : 'transparent',
+                    color: item.minutes > 0 ? 'var(--accent-primary)' : 'var(--text-muted)',
+                    transition: 'all 0.2s ease'
                   }}>
                     {item.minutes > 0 ? `${item.minutes}m` : '0m'}
                   </span>
 
-                  {/* Liquid Glass Bar */}
-                  <div
-                    style={{
-                      width: '28px',
-                      height: `${heightPercent}%`,
-                      borderRadius: '8px 8px 4px 4px',
-                      background: isHovered
-                        ? 'linear-gradient(180deg, var(--accent-cyan) 0%, var(--accent-primary) 100%)'
-                        : item.minutes > 0
-                          ? 'linear-gradient(180deg, #6366f1 0%, #a855f7 100%)'
-                          : 'var(--glass-surface-subtle)',
-                      border: `1px solid ${item.minutes > 0 ? 'rgba(99, 102, 241, 0.4)' : 'var(--glass-border)'}`,
-                      boxShadow: isHovered || item.minutes > 0 ? '0 4px 14px rgba(99, 102, 241, 0.35)' : 'none',
-                      transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
-                    }}
-                  />
+                  {/* Equalizer track column */}
+                  <div style={{
+                    width: '32px',
+                    height: '130px',
+                    borderRadius: '10px',
+                    background: 'var(--glass-surface-subtle)',
+                    border: '1px solid var(--glass-border)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'flex-end',
+                    padding: '3px',
+                    position: 'relative',
+                    overflow: 'hidden',
+                    boxShadow: isHovered ? '0 0 0 1px var(--accent-primary)' : 'none',
+                    transition: 'all 0.2s ease'
+                  }}>
+                    {/* The Shimmering Volume Bar */}
+                    <div
+                      className={item.minutes > 0 ? 'shimmer-bar-active' : ''}
+                      style={{
+                        width: '100%',
+                        height: `${heightPercent}%`,
+                        borderRadius: '6px',
+                        background: item.minutes > 0
+                          ? (isHovered
+                              ? 'linear-gradient(180deg, #06b6d4 0%, #6366f1 60%, #a855f7 100%)'
+                              : 'linear-gradient(180deg, #6366f1 0%, #a855f7 50%, #ec4899 100%)')
+                          : 'var(--glass-border)',
+                        borderTop: item.minutes > 0 ? '1px solid rgba(255, 255, 255, 0.7)' : 'none',
+                        transition: 'height 0.4s cubic-bezier(0.16, 1, 0.3, 1), background 0.2s ease'
+                      }}
+                    />
+                  </div>
+
+                  {/* Day label */}
                   <span style={{
-                    fontSize: '11px',
+                    fontSize: '11.5px',
                     fontWeight: isHovered ? 700 : 500,
-                    color: isHovered ? 'var(--text-primary)' : 'var(--text-muted)'
+                    color: isHovered ? 'var(--text-primary)' : 'var(--text-muted)',
+                    transition: 'color 0.2s ease'
                   }}>
                     {item.day}
                   </span>

@@ -580,6 +580,58 @@ button:disabled {
   animation: liquid-glow 3s ease-in-out infinite;
 }
 
+/* Shimmering Bar Chart Visuals */
+@keyframes bar-shimmer {
+  0% {
+    transform: translateY(120%);
+    opacity: 0;
+  }
+  35% {
+    opacity: 0.9;
+  }
+  70% {
+    opacity: 0.6;
+  }
+  100% {
+    transform: translateY(-120%);
+    opacity: 0;
+  }
+}
+
+@keyframes bar-glow-pulse {
+  0%, 100% {
+    box-shadow: 0 4px 18px rgba(99, 102, 241, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  }
+  50% {
+    box-shadow: 0 8px 24px rgba(168, 85, 247, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  }
+}
+
+.shimmer-bar-active {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(180deg, #6366f1 0%, #a855f7 50%, #ec4899 100%);
+  animation: bar-glow-pulse 3s ease-in-out infinite;
+}
+
+.shimmer-bar-active::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.65) 45%,
+    rgba(255, 255, 255, 0.85) 50%,
+    transparent 100%
+  );
+  animation: bar-shimmer 2.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  pointer-events: none;
+}
+
 /* Custom Scrollbars */
 ::-webkit-scrollbar {
   width: 6px;
@@ -597,4 +649,79 @@ button:disabled {
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--text-muted);
+}
+
+/* ==========================================================================
+   Shimmering Robot Icon
+   ========================================================================== */
+
+@keyframes robot-shimmer {
+  0% {
+    filter: drop-shadow(0 2px 8px rgba(99, 102, 241, 0.4)) brightness(1);
+  }
+  35% {
+    filter: drop-shadow(0 4px 18px rgba(168, 85, 247, 0.75)) drop-shadow(0 0 12px rgba(6, 182, 212, 0.5)) brightness(1.15);
+  }
+  70% {
+    filter: drop-shadow(0 2px 14px rgba(99, 102, 241, 0.6)) drop-shadow(0 0 9px rgba(244, 63, 94, 0.35)) brightness(1.08);
+  }
+  100% {
+    filter: drop-shadow(0 2px 8px rgba(99, 102, 241, 0.4)) brightness(1);
+  }
+}
+
+@keyframes robot-sweep {
+  0% {
+    transform: translateX(-150%) skewX(-20deg);
+  }
+  45%, 100% {
+    transform: translateX(250%) skewX(-20deg);
+  }
+}
+
+@keyframes robot-float {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-2px) scale(1.02);
+  }
+}
+
+.shimmering-robot-container {
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s ease;
+  cursor: pointer;
+}
+
+.shimmering-robot-container:hover {
+  transform: translateY(-1px) scale(1.05);
+}
+
+.shimmering-robot-img {
+  animation: robot-shimmer 3.2s ease-in-out infinite, robot-float 3.8s ease-in-out infinite;
+  user-select: none;
+  pointer-events: none;
+  display: block;
+}
+
+.robot-shimmer-sweep {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 60%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.38) 50%,
+    transparent 100%
+  );
+  pointer-events: none;
+  animation: robot-sweep 3.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
