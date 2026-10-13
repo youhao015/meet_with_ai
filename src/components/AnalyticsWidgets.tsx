@@ -7,7 +7,6 @@ import {
   Plus,
   ListTodo,
   CheckSquare,
-  Calendar,
   AlertCircle
 } from 'lucide-react';
 import {
@@ -382,10 +381,10 @@ export const AnalyticsWidgets: React.FC = () => {
                       background: isHovered
                         ? 'linear-gradient(180deg, var(--accent-cyan) 0%, var(--accent-primary) 100%)'
                         : item.minutes > 0
-                          ? 'linear-gradient(180deg, rgba(99, 102, 241, 0.85) 0%, rgba(139, 92, 246, 0.45) 100%)'
-                          : 'rgba(255, 255, 255, 0.05)',
-                      border: `1px solid ${item.minutes > 0 ? 'rgba(99, 102, 241, 0.35)' : 'rgba(255, 255, 255, 0.08)'}`,
-                      boxShadow: isHovered && item.minutes > 0 ? '0 4px 16px var(--accent-primary-glow)' : 'none',
+                          ? 'linear-gradient(180deg, #6366f1 0%, #a855f7 100%)'
+                          : 'var(--glass-surface-subtle)',
+                      border: `1px solid ${item.minutes > 0 ? 'rgba(99, 102, 241, 0.4)' : 'var(--glass-border)'}`,
+                      boxShadow: isHovered || item.minutes > 0 ? '0 4px 14px rgba(99, 102, 241, 0.35)' : 'none',
                       transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
                     }}
                   />
@@ -401,12 +400,8 @@ export const AnalyticsWidgets: React.FC = () => {
             })}
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '12px', fontSize: '11.5px', color: 'var(--text-muted)' }}>
-            <span>Total 7-day volume: {totalWeeklyMinutes} min ({totalWeeklySessions} session{totalWeeklySessions !== 1 ? 's' : ''})</span>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <Calendar size={12} />
-              Synced from PostgreSQL
-            </span>
+          <div style={{ marginTop: '12px', fontSize: '11.5px', color: 'var(--text-muted)' }}>
+            <span>Total 7-day volume: {weeklyActivity.reduce((acc, d) => acc + d.minutes, 0)} min ({weeklyActivity.reduce((acc, d) => acc + d.count, 0)} session{weeklyActivity.reduce((acc, d) => acc + d.count, 0) !== 1 ? 's' : ''})</span>
           </div>
         </div>
 
