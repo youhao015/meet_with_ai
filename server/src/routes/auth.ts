@@ -1,9 +1,8 @@
 import { Router } from 'express';
-import { createReqSupabaseClient } from '../utils/supabase.js';
+import { createReqSupabaseClient, supabaseAdmin } from '../utils/supabase.js';
 import type { Request, Response } from 'express';
 
-const router = Router();
-const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
+const CLIENT_URL = process.env.CLIENT_URL || '';
 
 /**
  * GET /auth/callback
@@ -73,6 +72,36 @@ router.post('/logout', async (req: Request, res: Response) => {
     return res.json({ success: true });
   } catch {
     return res.status(500).json({ error: 'Failed to log out' });
+  }
+});
+
+/**
+ * POST /auth/auto-confirm
+ * Automatically confirms user's email via admin API to avoid email verification delays & localhost:3000 redirects
+ */
+router.post('/auto-confirm', async (req: Request, res: Response) => {
+  const { email } = req.body;
+  if (!email) {
+    return res.status(400).json({ error: 'Email is required' });
+  }
+
+  try {
+    const { data, error: listError } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 100 });
+    if (listError) throw listError;
+
+    const user = data.users.find((u) => u.email?.toLowerCase() === String(email).trim().toLowerCase());
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    if (!user.email_confirmed_at) {
+      await supabaseAdmin.auth.admin.updateUserById(user.id, { email_confirm: true });
+    }
+
+    return res.json({ success: true, confirmed: true });
+  } catch (err) {
+    console.error('Auto-confirm error:', err);
+    return res.status(500).json({ error: 'Failed to auto-confirm user' });
   }
 });
 

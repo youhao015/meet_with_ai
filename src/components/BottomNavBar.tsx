@@ -52,6 +52,9 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({
           return (
             <button
               key={tab.id}
+              type="button"
+              id={`nav-tab-${tab.id}`}
+              data-tab={tab.id}
               onClick={() => {
                 if (isLocked) return;
                 onChangeTab(tab.id);
@@ -66,21 +69,23 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({
                 opacity: isLocked ? 0.38 : 1,
                 cursor: isLocked ? 'not-allowed' : 'pointer',
                 filter: isLocked ? 'grayscale(0.6)' : 'none',
-                transition: 'all 0.2s ease'
+                transition: 'all 0.2s ease',
+                pointerEvents: 'auto'
               }}
             >
-              <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
                 <Icon
                   size={19}
                   strokeWidth={isActive ? 2.4 : 1.9}
                   style={{
                     color: isActive ? 'var(--accent-primary)' : 'currentColor',
                     transition: 'all 0.2s ease',
-                    filter: isActive ? 'drop-shadow(0 2px 8px var(--accent-primary-glow))' : 'none'
+                    filter: isActive ? 'drop-shadow(0 2px 8px var(--accent-primary-glow))' : 'none',
+                    pointerEvents: 'none'
                   }}
                 />
               </div>
-              <span className="dock-label">{tab.label}</span>
+              <span className="dock-label" style={{ pointerEvents: 'none' }}>{tab.label}</span>
             </button>
           );
         })}

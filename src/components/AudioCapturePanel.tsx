@@ -22,7 +22,7 @@ import {
 } from '../services/transcription';
 
 interface AudioCapturePanelProps {
-  onSummaryGenerated: (result: SummarizeResult, meetingTitle: string, transcript: string) => void;
+  onSummaryGenerated: (result: SummarizeResult, meetingTitle: string, transcript: string, meetingId?: string) => void;
   onRecordingStateChange?: (isRecording: boolean) => void;
   onSummarizingStateChange?: (isSummarizing: boolean) => void;
 }
@@ -141,11 +141,17 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
     } else {
       document.title = 'MeetWithAI';
     }
+    return () => {
+      onRecordingStateChange?.(false);
+    };
   }, [isRecording, onRecordingStateChange]);
 
   // Notify parent of summarization status to lock tabs while AI is generating
   useEffect(() => {
     onSummarizingStateChange?.(isSummarizing);
+    return () => {
+      onSummarizingStateChange?.(false);
+    };
   }, [isSummarizing, onSummarizingStateChange]);
 
   // Fallback transcription if recording completed without live chunks (e.g. key added afterwards)
@@ -275,9 +281,10 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
 
       setActiveTier(result.tierUsed as 'cloud' | 'local-webgpu' | 'heuristic');
 
+      let savedMeetingId: string | undefined;
       // Automatically persist to Supabase database
       try {
-        await saveMeetingWithItems({
+        const saved = await saveMeetingWithItems({
           title: displayTitle,
           duration_seconds: recordingDuration,
           source: 'live',
@@ -285,17 +292,21 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
           summary: result.summary,
           audio_url: result.audioUrl
         }, result.summary.action_items);
+        if (saved?.id) {
+          savedMeetingId = saved.id;
+        }
       } catch (saveErr) {
         console.warn('Note: Summarization succeeded; Supabase sync error:', saveErr);
       }
 
-      onSummaryGenerated(result, displayTitle, textToSummarize);
+      onSummaryGenerated(result, displayTitle, textToSummarize, savedMeetingId);
     } catch (err: unknown) {
       console.error('Summarization failure:', err);
       const errMsg = err instanceof Error ? err.message : String(err || '');
       setErrorMessage(`Summarization failed: ${errMsg || 'Unknown error'}`);
     } finally {
       setIsSummarizing(false);
+      onSummarizingStateChange?.(false);
     }
   };
 
@@ -603,11 +614,11 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
                   width: '6px',
                   height: '6px',
                   borderRadius: '50%',
-                  background: audioLevel > 5 ? '#22c55e' : '#10b981',
+                  background: isTranscribingChunk ? '#a855f7' : (audioLevel > 5 ? '#22c55e' : '#10b981'),
                   animation: 'pulse 1s infinite',
                   display: 'inline-block'
                 }} />
-                Audio Stream Active
+                {isTranscribingChunk ? 'Audio Stream Active (Syncing…)' : 'Audio Stream Active'}
               </span>
             )}
             {!isRecording && isListening && hasAudioInput && (
@@ -631,33 +642,6 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
             Editable text area
           </span>
         </div>
-
-        {/* Live Audio Stream Bar */}
-        {isRecording && (
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px',
-            padding: '10px 16px',
-            marginBottom: '12px',
-            background: 'rgba(99, 102, 241, 0.08)',
-            border: '1px solid rgba(99, 102, 241, 0.22)',
-            borderRadius: '12px'
-          }}>
-            <span style={{
-              width: '8px',
-              height: '8px',
-              borderRadius: '50%',
-              background: isTranscribingChunk ? '#a855f7' : (audioLevel > 5 ? '#10b981' : '#6366f1'),
-              boxShadow: audioLevel > 5 ? '0 0 8px rgba(16, 185, 129, 0.6)' : 'none',
-              animation: 'pulse 1s infinite',
-              flexShrink: 0
-            }} />
-            <span style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--accent-primary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-              {isTranscribingChunk ? 'Audio Stream Active (Syncing…)' : 'Audio Stream Active'}
-            </span>
-          </div>
-        )}
 
         {/* Fallback Real-time Voice Stream Bar if Web Speech is active without recording */}
         {!isRecording && isListening && (

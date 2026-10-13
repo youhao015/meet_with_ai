@@ -23,7 +23,7 @@ export interface MeetingRecord {
     overview?: string;
     key_points?: string[];
     decisions?: string[];
-    action_items?: Array<{ task: string; assignee: string; due_date?: string }>;
+    action_items?: Array<{ task: string; assignee: string; due_date?: string; status?: 'pending' | 'completed' }>;
   };
   status: string;
   audio_url?: string;
@@ -143,6 +143,48 @@ export async function updateActionItemStatus(
     return false;
   }
   return true;
+}
+
+/** Update meeting action items in both meetings table and action_items table */
+export async function updateMeetingActionItems(
+  meetingId: string,
+  actionItems: Array<{ task: string; assignee?: string; due_date?: string; status?: 'pending' | 'completed' }>
+): Promise<boolean> {
+  try {
+    // 1. Update summary column in meetings table
+    const { data: meeting } = await supabase
+      .from('meetings')
+      .select('summary')
+      .eq('id', meetingId)
+      .single();
+
+    if (meeting && meeting.summary) {
+      const updatedSummary = {
+        ...meeting.summary,
+        action_items: actionItems
+      };
+      await supabase
+        .from('meetings')
+        .update({ summary: updatedSummary })
+        .eq('id', meetingId);
+    }
+
+    // 2. Also update status in action_items table for matching tasks
+    for (const item of actionItems) {
+      if (!item.task) continue;
+      const statusVal = item.status === 'completed' ? 'completed' : 'pending';
+      await supabase
+        .from('action_items')
+        .update({ status: statusVal })
+        .eq('meeting_id', meetingId)
+        .eq('task', item.task);
+    }
+
+    return true;
+  } catch (err) {
+    console.warn('[updateMeetingActionItems] Error:', err);
+    return false;
+  }
 }
 
 /** Fetch action items for a specific meeting */

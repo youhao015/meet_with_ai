@@ -21,11 +21,32 @@ export const MeetingHistory: React.FC<MeetingHistoryProps> = ({ onSelectMeeting 
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [playingId, setPlayingId] = useState<string | null>(null);
 
+  const mergeLocalStorage = (list: MeetingRecord[]): MeetingRecord[] => {
+    return list.map((m) => {
+      try {
+        const cached = localStorage.getItem(`meetwithai_action_items_${m.id}`);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0 && m.summary) {
+            return {
+              ...m,
+              summary: {
+                ...m.summary,
+                action_items: parsed
+              }
+            };
+          }
+        }
+      } catch {}
+      return m;
+    });
+  };
+
   const refreshMeetings = async () => {
     setIsLoading(true);
     try {
       const data = await fetchMeetings();
-      setMeetings(data);
+      setMeetings(mergeLocalStorage(data));
     } catch (e) {
       console.warn('Error loading history:', e);
     } finally {
@@ -38,7 +59,7 @@ export const MeetingHistory: React.FC<MeetingHistoryProps> = ({ onSelectMeeting 
     fetchMeetings()
       .then((data) => {
         if (!ignore) {
-          setMeetings(data);
+          setMeetings(mergeLocalStorage(data));
           setIsLoading(false);
         }
       })

@@ -15,6 +15,7 @@ function AppShell() {
   const [currentSummaryResult, setCurrentSummaryResult] = useState<SummarizeResult | null>(null);
   const [currentTitle, setCurrentTitle] = useState<string>('');
   const [currentTranscript, setCurrentTranscript] = useState<string>('');
+  const [currentMeetingId, setCurrentMeetingId] = useState<string | null>(null);
   const [vaultMeeting, setVaultMeeting] = useState<MeetingRecord | null>(null);
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const [isSummarizing, setIsSummarizing] = useState<boolean>(false);
@@ -22,19 +23,38 @@ function AppShell() {
   const handleSummaryGenerated = (
     result: SummarizeResult,
     title: string,
-    transcript: string
+    transcript: string,
+    meetingId?: string
   ) => {
     setCurrentSummaryResult(result);
     setCurrentTitle(title);
     setCurrentTranscript(transcript);
+    if (meetingId) setCurrentMeetingId(meetingId);
   };
 
   const handleSelectHistoryMeeting = (meeting: MeetingRecord) => {
+    // If cached in localStorage, merge it for instant consistency
+    try {
+      const cached = localStorage.getItem(`meetwithai_action_items_${meeting.id}`);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0 && meeting.summary) {
+          meeting = {
+            ...meeting,
+            summary: {
+              ...meeting.summary,
+              action_items: parsed
+            }
+          };
+        }
+      }
+    } catch {}
     setVaultMeeting(meeting);
   };
 
   const handleNewMeeting = () => {
     setCurrentSummaryResult(null);
+    setCurrentMeetingId(null);
     setVaultMeeting(null);
     setCurrentTitle('');
     setCurrentTranscript('');
@@ -68,10 +88,14 @@ function AppShell() {
           <>
             {currentSummaryResult ? (
               <MeetingSummaryView
+                meetingId={currentMeetingId || undefined}
                 result={currentSummaryResult}
                 title={currentTitle}
                 transcript={currentTranscript}
                 onBack={() => setCurrentSummaryResult(null)}
+                onMeetingUpdated={(updatedSummary) => {
+                  setCurrentSummaryResult((prev) => prev ? { ...prev, summary: updatedSummary } : null);
+                }}
               />
             ) : (
               <AudioCapturePanel
@@ -86,6 +110,7 @@ function AppShell() {
         {activeTab === 'vault' && (
           vaultMeeting ? (
             <MeetingSummaryView
+              meetingId={vaultMeeting.id}
               result={{
                 summary: {
                   overview: vaultMeeting.summary?.overview || '',
@@ -99,6 +124,9 @@ function AppShell() {
               transcript={vaultMeeting.transcript}
               onBack={() => setVaultMeeting(null)}
               backLabel="Back to Vault"
+              onMeetingUpdated={(updatedSummary) => {
+                setVaultMeeting((prev) => prev ? { ...prev, summary: updatedSummary } : null);
+              }}
             />
           ) : (
             <MeetingHistory onSelectMeeting={handleSelectHistoryMeeting} />
@@ -120,15 +148,25 @@ function AppShell() {
           if ((isRecording || isSummarizing) && tab !== 'studio') {
             return;
           }
-          setActiveTab(tab);
-          // When switching to studio, clear any old summary so the Live Studio recorder is shown
           if (tab === 'studio') {
+            // Unconditionally clear summaries and vault state so Live Studio recorder is guaranteed to show
             setCurrentSummaryResult(null);
-          }
-          // When navigating away from vault, clear any opened vault meeting
-          if (tab !== 'vault') {
+            setCurrentMeetingId(null);
+            setVaultMeeting(null);
+            setCurrentTitle('');
+            setCurrentTranscript('');
+            setIsRecording(false);
+            setIsSummarizing(false);
+          } else if (tab === 'vault') {
+            // If already in vault and user clicks Vault again, return to meeting history list
+            if (activeTab === 'vault' && vaultMeeting) {
+              setVaultMeeting(null);
+            }
+          } else {
+            // Leaving vault for another tab
             setVaultMeeting(null);
           }
+          setActiveTab(tab);
         }}
       />
     </div>

@@ -29,20 +29,34 @@ export function AuthPage() {
     try {
       if (mode === 'login') {
         const { error } = await signInWithEmail(email, password);
-        if (error) setError(error);
-      } else if (mode === 'signup') {
-        if (!fullName.trim()) { setError('Please enter your full name.'); setIsLoading(false); return; }
-        if (password.length < 8) { setError('Password must be at least 8 characters.'); setIsLoading(false); return; }
-        const { error, session } = await signUpWithEmail(email, password, fullName.trim());
         if (error) {
-          if (error.toLowerCase().includes('rate limit')) {
-            setError('Supabase email rate limit exceeded (default limit is 3-4 emails/hour). To fix this permanently, disable "Confirm email" under Authentication > Providers > Email in your Supabase dashboard.');
+          if (error.toLowerCase().includes('not confirmed')) {
+            setError('Email verification is required by Supabase. Turn OFF "Confirm email" in Supabase (Authentication > Providers > Email) to log in instantly without email verification.');
           } else {
             setError(error);
           }
-        } else if (!session) {
-          setSuccess('Account created! Check your email to confirm, then sign in.');
-          setMode('login');
+        }
+      } else if (mode === 'signup') {
+        if (!fullName.trim()) { setError('Please enter your full name.'); setIsLoading(false); return; }
+        if (password.length < 8) { setError('Password must be at least 8 characters.'); setIsLoading(false); return; }
+        const { error } = await signUpWithEmail(email, password, fullName.trim());
+        if (error) {
+          if (error.toLowerCase().includes('rate limit')) {
+            setError('Supabase email rate limit reached. Turn OFF "Confirm email" in Supabase (Authentication > Providers > Email) to create accounts without emails.');
+          } else {
+            setError(error);
+          }
+        } else {
+          // Immediately sign in so no verification email is required
+          const login = await signInWithEmail(email, password);
+          if (login.error) {
+            if (login.error.toLowerCase().includes('not confirmed')) {
+              setError('Account created! Turn OFF "Confirm email" in Supabase (Authentication > Providers > Email) to sign in without email confirmation.');
+            } else {
+              setSuccess('Account created! You can now sign in.');
+              setMode('login');
+            }
+          }
         }
       } else if (mode === 'reset') {
         const { error } = await sendPasswordReset(email);

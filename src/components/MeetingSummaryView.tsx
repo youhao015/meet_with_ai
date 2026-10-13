@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   CheckCircle2,
   ListTodo,
@@ -10,6 +10,7 @@ import {
   User
 } from 'lucide-react';
 import type { SummarizeResult } from '../services/summarizer';
+import { fetchActionItems, updateMeetingActionItems } from '../services/supabase';
 
 interface ActionItemWithStatus {
   task: string;
@@ -19,34 +20,106 @@ interface ActionItemWithStatus {
 }
 
 interface MeetingSummaryViewProps {
+  meetingId?: string;
   result: SummarizeResult;
   title: string;
   transcript: string;
   onBack: () => void;
   backLabel?: string;
+  onMeetingUpdated?: (updatedSummary: SummarizeResult['summary']) => void;
 }
 
 export const MeetingSummaryView: React.FC<MeetingSummaryViewProps> = ({
+  meetingId,
   result,
   title,
   transcript,
   onBack,
-  backLabel = 'Back to Studio'
+  backLabel = 'Back to Studio',
+  onMeetingUpdated
 }) => {
   const [copied, setCopied] = useState(false);
-  const [actionItems, setActionItems] = useState<ActionItemWithStatus[]>(result.summary.action_items || []);
+  const [actionItems, setActionItems] = useState<ActionItemWithStatus[]>(() => {
+    const initial = result.summary.action_items || [];
+    if (meetingId) {
+      try {
+        const cached = localStorage.getItem(`meetwithai_action_items_${meetingId}`);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            return parsed;
+          }
+        }
+      } catch {}
+    }
+    return initial;
+  });
 
-  const toggleTaskStatus = (index: number) => {
-    setActionItems((prev) =>
-      prev.map((item, i) =>
-        i === index
-          ? {
-              ...item,
-              status: item.status === 'completed' ? 'pending' : 'completed'
+  // Sync action items with Supabase action_items table if meetingId is provided
+  useEffect(() => {
+    if (!meetingId) return;
+
+    fetchActionItems(meetingId).then((dbItems) => {
+      if (dbItems && dbItems.length > 0) {
+        setActionItems((prev) => {
+          const merged = prev.map((item) => {
+            const match = dbItems.find(
+              (d) => d.task?.trim().toLowerCase() === item.task?.trim().toLowerCase()
+            );
+            if (match) {
+              return {
+                ...item,
+                status: (match.status === 'completed' ? 'completed' : 'pending') as 'pending' | 'completed'
+              };
             }
-          : item
-      )
+            return item;
+          });
+          try {
+            localStorage.setItem(`meetwithai_action_items_${meetingId}`, JSON.stringify(merged));
+          } catch {}
+          return merged;
+        });
+      }
+    }).catch((err) => {
+      console.warn('Could not sync action items from Supabase:', err);
+    });
+  }, [meetingId]);
+
+  const toggleTaskStatus = async (index: number) => {
+    const updated = actionItems.map((item, i) =>
+      i === index
+        ? {
+            ...item,
+            status: (item.status === 'completed' ? 'pending' : 'completed') as 'pending' | 'completed'
+          }
+        : item
     );
+
+    // 1. Optimistic UI update
+    setActionItems(updated);
+
+    // 2. Persist to localStorage immediately
+    if (meetingId) {
+      try {
+        localStorage.setItem(`meetwithai_action_items_${meetingId}`, JSON.stringify(updated));
+      } catch {}
+    }
+
+    // 3. Notify parent component
+    const updatedSummary = {
+      ...result.summary,
+      action_items: updated
+    };
+    onMeetingUpdated?.(updatedSummary);
+
+    // 4. Persist to Supabase database (both meetings and action_items tables)
+    if (meetingId) {
+      try {
+        await updateMeetingActionItems(meetingId, updated);
+      } catch (err) {
+        console.warn('Failed to update action items in Supabase:', err);
+      }
+    }
   };
 
   const copyToClipboard = () => {

@@ -345,6 +345,11 @@ button:disabled {
   position: relative;
   transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
   user-select: none;
+  pointer-events: auto;
+}
+
+.ios-dock-tab * {
+  pointer-events: none;
 }
 
 .ios-dock-tab:hover {

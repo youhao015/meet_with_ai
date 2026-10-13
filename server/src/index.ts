@@ -10,13 +10,13 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
+const CLIENT_URL = process.env.CLIENT_URL || '';
 
 // Middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(cookieParser());
 app.use(cors({
-  origin: [CLIENT_URL, 'http://localhost:5173', 'http://127.0.0.1:5173'],
+  origin: CLIENT_URL ? [CLIENT_URL] : true,
   credentials: true
 }));
 
@@ -35,5 +35,5 @@ app.get('/api/health', (_req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`[MeetWithAI Backend] Listening on http://localhost:${PORT}`);
+  console.log(`[MeetWithAI Backend] Listening on port ${PORT}`);
 });
