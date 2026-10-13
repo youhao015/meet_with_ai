@@ -281,9 +281,9 @@ button:disabled {
   display: flex;
   align-items: center;
   gap: 6px;
-  background-color: color-mix(in srgb, var(--dock-bg) 32%, transparent);
-  backdrop-filter: blur(13px) saturate(150%);
-  -webkit-backdrop-filter: blur(13px) saturate(150%);
+  background-color: color-mix(in srgb, var(--dock-bg) 12%, transparent);
+  backdrop-filter: blur(10px) saturate(135%);
+  -webkit-backdrop-filter: blur(10px) saturate(135%);
   padding: 8px 9px;
   border-radius: 34px;
   border: 1px solid color-mix(in srgb, white calc(var(--glass-reflex-light) * 52%), transparent);
@@ -356,7 +356,7 @@ button:disabled {
 }
 
 .ios-dock-tab.active {
-  background-color: color-mix(in srgb, var(--dock-indicator) 32%, transparent);
+  background-color: color-mix(in srgb, var(--dock-indicator) 18%, transparent);
   border-color: color-mix(in srgb, white calc(var(--glass-reflex-light) * 48%), transparent);
   color: var(--accent-primary);
   box-shadow:
