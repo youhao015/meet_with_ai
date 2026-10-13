@@ -74,13 +74,12 @@ cd ..
 ```env
 VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
-VITE_API_URL=http://localhost:3001
 ```
 
 **Backend (`server/.env`):**
 ```env
 PORT=3001
-CORS_ORIGIN=http://localhost:5173
+CORS_ORIGIN=https://your-app.vercel.app
 OPENROUTER_API_KEY=your-openrouter-api-key  # Optional: falls back to heuristic if unset
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
@@ -92,7 +91,7 @@ Run the SQL script in [`supabase/schema.sql`](supabase/schema.sql) in your **Sup
 - Creates `meetings`, `action_items`, `oauth_tokens` tables with Row Level Security (RLS).
 - Sets up the `meeting-recordings` storage bucket and access policies for audio files.
 
-### 4. Run Locally
+### 4. Run Development
 
 Start both the backend server and frontend development server:
 
@@ -105,7 +104,7 @@ npm run dev
 npm run dev
 ```
 
-Open [http://localhost:5173](http://localhost:5173) in Chrome or Edge (WebGPU supported browsers).
+Open the development URL in Chrome or Edge (WebGPU supported browsers).
 
 ---
 
