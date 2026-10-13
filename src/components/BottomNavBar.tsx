@@ -21,7 +21,7 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({
       id: 'studio' as NavTab,
       label: 'Studio',
       icon: Mic,
-      badge: isRecording ? 'REC' : isSummarizing ? 'AI…' : undefined
+      badge: isRecording ? 'REC' : undefined
     },
     {
       id: 'vault' as NavTab,
