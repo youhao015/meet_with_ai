@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { createReqSupabaseClient, supabaseAdmin } from '../utils/supabase.js';
 import type { Request, Response } from 'express';
 
+const router = Router();
 const CLIENT_URL = process.env.CLIENT_URL || '';
 
 /**
@@ -77,7 +78,7 @@ router.post('/logout', async (req: Request, res: Response) => {
 
 /**
  * POST /auth/auto-confirm
- * Automatically confirms user's email via admin API to avoid email verification delays & localhost:3000 redirects
+ * Automatically confirms user's email via admin API to avoid email verification delays
  */
 router.post('/auto-confirm', async (req: Request, res: Response) => {
   const { email } = req.body;
