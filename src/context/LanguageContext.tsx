@@ -56,7 +56,14 @@ export const translations = {
       sourceMic: 'Microphone Stream',
       sourceTab: 'Tab / System Audio Stream',
       audioDetected: 'Audio Active',
-      audioIdle: 'Idle'
+      audioIdle: 'Idle',
+      howItWorksBadge: 'For Zoom, Meet, or Teams: choose Capture Tab / System Audio, select the meeting tab, and enable tab audio.',
+      howItWorksBtn: 'How it works',
+      hideStepsBtn: 'Hide steps',
+      howItWorksStep1: 'Use Capture Tab / System Audio for calls in your browser.',
+      howItWorksStep2: 'In the share dialog, choose the meeting tab and turn on its audio.',
+      howItWorksStep3: 'Stop recording then generate your summary.',
+      tabRecordingActiveBanner: '🎙 Tab & screen audio is actively recorded into the audio file. Any microphone comments will stream into the transcript.'
     },
 
     // Summary View
@@ -265,7 +272,14 @@ export const translations = {
       sourceMic: '麦克风输入',
       sourceTab: '标签页 / 系统音频流',
       audioDetected: '检测到声音',
-      audioIdle: '静音'
+      audioIdle: '静音',
+      howItWorksBadge: '针对 Zoom、腾讯会议、Google Meet 或 Teams：请点击“采集标签页 / 系统音频”，选择会议标签页并勾选“同时共享音频”。',
+      howItWorksBtn: '使用说明',
+      hideStepsBtn: '收起步骤',
+      howItWorksStep1: '在浏览器中进行会议时，点击“采集标签页 / 系统音频”。',
+      howItWorksStep2: '在弹出的浏览器共享窗口中，选择会议所在的标签页并勾选“共享标签页音频”。',
+      howItWorksStep3: '会议结束后点击“停止录音”，即可一键生成 AI 智能纪要。',
+      tabRecordingActiveBanner: '🎙 正在录制标签页与系统音频。麦克风发言将实时同步至对话文本。'
     },
 
     // Summary View

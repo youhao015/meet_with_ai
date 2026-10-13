@@ -540,7 +540,15 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
           }}>
             <span style={{ fontSize: '16px' }}>🎧</span>
             <span style={{ flex: 1 }}>
-              <strong>For Zoom, Meet, or Teams:</strong> choose <strong>Record Meeting Audio</strong>, select the meeting tab, and enable tab audio.
+              {language === 'zh' ? (
+                <>
+                  <strong>针对 Zoom、腾讯会议、Google Meet 或 Teams：</strong>选择<strong>采集标签页 / 系统音频</strong>，选中会议标签页并勾选“同时共享音频”。
+                </>
+              ) : (
+                <>
+                  <strong>For Zoom, Meet, or Teams:</strong> choose <strong>Capture Tab / System Audio</strong>, select the meeting tab, and enable tab audio.
+                </>
+              )}
             </span>
             <button
               type="button"
@@ -549,16 +557,16 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
               className="btn-secondary"
               style={{ padding: '5px 9px', fontSize: '11.5px', flexShrink: 0 }}
             >
-              {showCaptureHelp ? 'Hide steps' : 'How it works'}
+              {showCaptureHelp ? t.studio.hideStepsBtn : t.studio.howItWorksBtn}
             </button>
           </div>
         )}
 
         {!showActiveRecording && showCaptureHelp && (
           <ol style={{ margin: '10px 0 0 20px', color: 'var(--text-secondary)', fontSize: '12.5px', lineHeight: 1.7 }}>
-            <li>Use <strong>Record Meeting Audio</strong> for calls in your browser.</li>
-            <li>In the share dialog, choose the meeting tab and turn on its audio.</li>
-            <li>Stop recording then generate your summary.</li>
+            <li>{t.studio.howItWorksStep1}</li>
+            <li>{t.studio.howItWorksStep2}</li>
+            <li>{t.studio.howItWorksStep3}</li>
           </ol>
         )}
 
@@ -576,7 +584,7 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
             alignItems: 'center',
             gap: '8px'
           }}>
-            <span>🎙 Tab & screen audio is actively recorded into the audio file. Any microphone comments will stream into the transcript.</span>
+            <span>{t.studio.tabRecordingActiveBanner}</span>
           </div>
         )}
 
