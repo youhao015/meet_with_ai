@@ -39,11 +39,25 @@ function AppShell() {
       if (cached) {
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed) && parsed.length > 0 && meeting.summary) {
+          const dbItems = meeting.summary.action_items || [];
+          const mergedItems = dbItems.map((dbItem) => {
+            const match = parsed.find(
+              (p: { task?: string; status?: string }) => p.task?.trim().toLowerCase() === dbItem.task?.trim().toLowerCase()
+            );
+            if (match) {
+              return {
+                ...dbItem,
+                status: (match.status === 'completed' || dbItem.status === 'completed') ? 'completed' : match.status || 'pending'
+              };
+            }
+            return dbItem;
+          });
+
           meeting = {
             ...meeting,
             summary: {
               ...meeting.summary,
-              action_items: parsed
+              action_items: mergedItems.length > 0 ? mergedItems : parsed
             }
           };
         }
@@ -88,6 +102,7 @@ function AppShell() {
           <>
             {currentSummaryResult ? (
               <MeetingSummaryView
+                key={`studio-${currentMeetingId || 'active'}`}
                 meetingId={currentMeetingId || undefined}
                 result={currentSummaryResult}
                 title={currentTitle}
@@ -110,6 +125,7 @@ function AppShell() {
         {activeTab === 'vault' && (
           vaultMeeting ? (
             <MeetingSummaryView
+              key={`vault-${vaultMeeting.id}`}
               meetingId={vaultMeeting.id}
               result={{
                 summary: {

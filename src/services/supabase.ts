@@ -61,6 +61,12 @@ export type ActionItemInput = {
   due_date?: string;
 };
 
+function safeParseDate(val?: string): string | null {
+  if (!val) return null;
+  const d = new Date(val);
+  return isNaN(d.getTime()) ? null : d.toISOString();
+}
+
 // Save meeting and action items
 export async function saveMeetingWithItems(meeting: Partial<MeetingRecord>, actionItems?: ActionItemInput[]): Promise<MeetingRecord | null> {
   const { data: { user } } = await supabase.auth.getUser();
@@ -86,16 +92,20 @@ export async function saveMeetingWithItems(meeting: Partial<MeetingRecord>, acti
   }
 
   if (actionItems && actionItems.length > 0 && savedMeeting) {
-    const items = actionItems.map((item) => ({
-      meeting_id: savedMeeting.id,
-      user_id: user?.id || null,
-      task: item.task,
-      assignee: item.assignee || 'Unassigned',
-      due_date: item.due_date ? new Date(item.due_date).toISOString() : null,
-      status: 'pending'
-    }));
+    try {
+      const items = actionItems.map((item) => ({
+        meeting_id: savedMeeting.id,
+        user_id: user?.id || null,
+        task: item.task,
+        assignee: item.assignee || 'Unassigned',
+        due_date: safeParseDate(item.due_date),
+        status: 'pending' as const
+      }));
 
-    await supabase.from('action_items').insert(items);
+      await supabase.from('action_items').insert(items);
+    } catch (itemErr) {
+      console.warn('[saveMeetingWithItems] Action items sync warning:', itemErr);
+    }
   }
 
   return savedMeeting;
@@ -148,36 +158,69 @@ export async function updateActionItemStatus(
 /** Update meeting action items in both meetings table and action_items table */
 export async function updateMeetingActionItems(
   meetingId: string,
-  actionItems: Array<{ task: string; assignee?: string; due_date?: string; status?: 'pending' | 'completed' }>
+  actionItems: Array<{ task: string; assignee?: string; due_date?: string; status?: 'pending' | 'completed' }>,
+  existingSummary?: MeetingRecord['summary']
 ): Promise<boolean> {
   try {
-    // 1. Update summary column in meetings table
-    const { data: meeting } = await supabase
-      .from('meetings')
-      .select('summary')
-      .eq('id', meetingId)
-      .single();
-
-    if (meeting && meeting.summary) {
-      const updatedSummary = {
-        ...meeting.summary,
-        action_items: actionItems
-      };
-      await supabase
+    // 1. Resolve current summary
+    let summaryToUpdate = existingSummary;
+    if (!summaryToUpdate || Object.keys(summaryToUpdate).length === 0) {
+      const { data: meeting, error: selectErr } = await supabase
         .from('meetings')
-        .update({ summary: updatedSummary })
-        .eq('id', meetingId);
+        .select('summary')
+        .eq('id', meetingId)
+        .single();
+
+      if (!selectErr && meeting?.summary) {
+        summaryToUpdate = meeting.summary;
+      }
     }
 
-    // 2. Also update status in action_items table for matching tasks
+    const updatedSummary = {
+      ...(summaryToUpdate || {}),
+      action_items: actionItems
+    };
+
+    // 2. Persist updated summary to meetings table
+    const { error: updateErr } = await supabase
+      .from('meetings')
+      .update({
+        summary: updatedSummary,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', meetingId);
+
+    if (updateErr) {
+      console.warn('[updateMeetingActionItems] Error updating meetings table:', updateErr.message);
+    }
+
+    // 3. Keep action_items table in sync (update existing or insert new row)
+    const { data: { user } } = await supabase.auth.getUser();
     for (const item of actionItems) {
       if (!item.task) continue;
       const statusVal = item.status === 'completed' ? 'completed' : 'pending';
-      await supabase
+
+      const { data: existingRows } = await supabase
         .from('action_items')
-        .update({ status: statusVal })
+        .update({
+          status: statusVal,
+          updated_at: new Date().toISOString()
+        })
         .eq('meeting_id', meetingId)
-        .eq('task', item.task);
+        .eq('task', item.task)
+        .select();
+
+      if (!existingRows || existingRows.length === 0) {
+        await supabase
+          .from('action_items')
+          .insert({
+            meeting_id: meetingId,
+            user_id: user?.id || null,
+            task: item.task,
+            assignee: item.assignee || 'Unassigned',
+            status: statusVal
+          });
+      }
     }
 
     return true;

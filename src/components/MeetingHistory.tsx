@@ -28,11 +28,25 @@ export const MeetingHistory: React.FC<MeetingHistoryProps> = ({ onSelectMeeting 
         if (cached) {
           const parsed = JSON.parse(cached);
           if (Array.isArray(parsed) && parsed.length > 0 && m.summary) {
+            const dbItems = m.summary.action_items || [];
+            const mergedItems = dbItems.map((dbItem) => {
+              const match = parsed.find(
+                (p: { task?: string; status?: string }) => p.task?.trim().toLowerCase() === dbItem.task?.trim().toLowerCase()
+              );
+              if (match) {
+                return {
+                  ...dbItem,
+                  status: (match.status === 'completed' || dbItem.status === 'completed') ? 'completed' : match.status || 'pending'
+                };
+              }
+              return dbItem;
+            });
+
             return {
               ...m,
               summary: {
                 ...m.summary,
-                action_items: parsed
+                action_items: mergedItems.length > 0 ? mergedItems : parsed
               }
             };
           }

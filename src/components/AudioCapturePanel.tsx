@@ -33,6 +33,7 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
   onSummarizingStateChange
 }) => {
   const [meetingTitle, setMeetingTitle] = useState('');
+  const [hasStarted, setHasStarted] = useState(false);
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [progressText, setProgressText] = useState<string>('');
   const [progressPercent, setProgressPercent] = useState<number>(0);
@@ -133,6 +134,15 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
     chunkIntervalMs: 10000 // 10-second interval: optimal balance of rate-limits (~6 req/min) & Whisper accuracy
   });
 
+  // Synchronize hasStarted whenever recording becomes active
+  useEffect(() => {
+    if (isRecording) {
+      setHasStarted(true);
+    }
+  }, [isRecording]);
+
+  const showActiveRecording = hasStarted || isRecording;
+
   // Keep browser tab title updated so background recording is clearly visible
   useEffect(() => {
     onRecordingStateChange?.(isRecording);
@@ -198,6 +208,7 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
 
   const handleStartCapture = async (mode: 'mic' | 'system') => {
     try {
+      setHasStarted(true);
       setErrorMessage(null);
 
       // 1. Establish audio capture
@@ -231,6 +242,8 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
   const handleReset = () => {
     resetRecording();
     resetTranscript();
+    setHasStarted(false);
+    setShowCaptureHelp(false);
     setErrorMessage(null);
     setProgressText('');
     setProgressPercent(0);
@@ -343,36 +356,38 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
             />
           </div>
 
-          {/* Recording Timer & Audio Wave */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '16px',
-            background: 'var(--glass-surface-subtle)',
-            padding: '10px 18px',
-            borderRadius: '14px',
-            border: '1px solid var(--glass-border)',
-            alignSelf: 'flex-end',
-            minHeight: '76px'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              {isRecording ? (
-                <div style={{
-                  width: '10px', height: '10px', borderRadius: '50%',
-                  background: 'var(--accent-rose)', animation: 'pulse 1s infinite'
-                }} />
-              ) : (
-                <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: 'var(--text-muted)' }} />
-              )}
-              <span style={{ fontFamily: 'monospace', fontSize: '18px', fontWeight: 700, color: isRecording ? 'var(--accent-rose)' : 'var(--text-secondary)' }}>
-                {formatDuration(recordingDuration)}
-              </span>
+          {/* Recording Timer & Audio Wave - hidden before recording */}
+          {showActiveRecording && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '16px',
+              background: 'var(--glass-surface-subtle)',
+              padding: '10px 18px',
+              borderRadius: '14px',
+              border: '1px solid var(--glass-border)',
+              alignSelf: 'flex-end',
+              minHeight: '76px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {isRecording ? (
+                  <div style={{
+                    width: '10px', height: '10px', borderRadius: '50%',
+                    background: 'var(--accent-rose)', animation: 'pulse 1s infinite'
+                  }} />
+                ) : (
+                  <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: 'var(--text-muted)' }} />
+                )}
+                <span style={{ fontFamily: 'monospace', fontSize: '18px', fontWeight: 700, color: isRecording ? 'var(--accent-rose)' : 'var(--text-secondary)' }}>
+                  {formatDuration(recordingDuration)}
+                </span>
+              </div>
+
+              <div style={{ width: '1px', height: '24px', background: 'var(--glass-border)' }} />
+
+              <AudioVisualizer isRecording={isRecording} audioLevel={audioLevel} />
             </div>
-
-            <div style={{ width: '1px', height: '24px', background: 'var(--glass-border)' }} />
-
-            <AudioVisualizer isRecording={isRecording} audioLevel={audioLevel} />
-          </div>
+          )}
         </div>
 
         {/* Action Controls Bar */}
@@ -432,33 +447,35 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
             )}
           </div>
 
-          {/* Summarize Button */}
-          <button
-            id="btn-generate-summary"
-            onClick={handleSummarize}
-            disabled={isSummarizing || !transcript.trim()}
-            className="btn-primary"
-            style={{
-              background: isSummarizing
-                ? 'rgba(99, 102, 241, 0.4)'
-                : 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)',
-              cursor: isSummarizing ? 'not-allowed' : 'pointer',
-              opacity: !transcript.trim() && !isSummarizing ? 0.55 : 1
-            }}
-            title={!transcript.trim() ? 'Record, transcribe, or paste notes before generating a summary.' : undefined}
-          >
-            {isSummarizing ? (
-              <>
-                <RefreshCw size={16} style={{ animation: 'spin 1s linear infinite' }} />
-                Processing…
-              </>
-            ) : (
-              <>
-                <Sparkles size={16} />
-                Generate Summary
-              </>
-            )}
-          </button>
+          {/* Summarize Button - hidden before recording */}
+          {showActiveRecording && (
+            <button
+              id="btn-generate-summary"
+              onClick={handleSummarize}
+              disabled={isSummarizing || !transcript.trim()}
+              className="btn-primary"
+              style={{
+                background: isSummarizing
+                  ? 'rgba(99, 102, 241, 0.4)'
+                  : 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)',
+                cursor: isSummarizing ? 'not-allowed' : 'pointer',
+                opacity: !transcript.trim() && !isSummarizing ? 0.55 : 1
+              }}
+              title={!transcript.trim() ? 'Record speech or transcribe before generating a summary.' : undefined}
+            >
+              {isSummarizing ? (
+                <>
+                  <RefreshCw size={16} style={{ animation: 'spin 1s linear infinite' }} />
+                  Processing…
+                </>
+              ) : (
+                <>
+                  <Sparkles size={16} />
+                  Generate Summary
+                </>
+              )}
+            </button>
+          )}
         </div>
 
 
@@ -504,8 +521,8 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
           </div>
         )}
 
-        {/* Earphone Notice for Meetings */}
-        {!isRecording && (
+        {/* How it works guidance - shown before recording, hidden after starting recording */}
+        {!showActiveRecording && (
           <div style={{
             marginTop: '16px',
             padding: '10px 16px',
@@ -535,7 +552,7 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
           </div>
         )}
 
-        {!isRecording && showCaptureHelp && (
+        {!showActiveRecording && showCaptureHelp && (
           <ol style={{ margin: '10px 0 0 20px', color: 'var(--text-secondary)', fontSize: '12.5px', lineHeight: 1.7 }}>
             <li>Use <strong>Record Meeting Audio</strong> for calls in your browser.</li>
             <li>In the share dialog, choose the meeting tab and turn on its audio.</li>

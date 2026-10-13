@@ -21,7 +21,9 @@ const FREE_MODELS = [
   'google/gemma-2-9b-it:free'
 ] as const;
 
+const OPENROUTER_API = 'https://openrouter.ai/api/v1/chat/completions';
 const SITE_URL = process.env.SITE_URL || process.env.CLIENT_URL || '';
+const SITE_NAME = 'MeetWithAI';
 
 // ── Heuristic fallback ────────────────────────────────────────────────────────
 

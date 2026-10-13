@@ -55,6 +55,23 @@ export const MeetingSummaryView: React.FC<MeetingSummaryViewProps> = ({
     return initial;
   });
 
+  // Re-sync action items when meetingId or result changes
+  useEffect(() => {
+    let items = result.summary.action_items || [];
+    if (meetingId) {
+      try {
+        const cached = localStorage.getItem(`meetwithai_action_items_${meetingId}`);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            items = parsed;
+          }
+        }
+      } catch {}
+    }
+    setActionItems(items);
+  }, [meetingId, result]);
+
   // Sync action items with Supabase action_items table if meetingId is provided
   useEffect(() => {
     if (!meetingId) return;
@@ -67,9 +84,10 @@ export const MeetingSummaryView: React.FC<MeetingSummaryViewProps> = ({
               (d) => d.task?.trim().toLowerCase() === item.task?.trim().toLowerCase()
             );
             if (match) {
+              const statusVal: 'pending' | 'completed' = (match.status === 'completed' || item.status === 'completed') ? 'completed' : 'pending';
               return {
                 ...item,
-                status: (match.status === 'completed' ? 'completed' : 'pending') as 'pending' | 'completed'
+                status: statusVal
               };
             }
             return item;
@@ -115,7 +133,7 @@ export const MeetingSummaryView: React.FC<MeetingSummaryViewProps> = ({
     // 4. Persist to Supabase database (both meetings and action_items tables)
     if (meetingId) {
       try {
-        await updateMeetingActionItems(meetingId, updated);
+        await updateMeetingActionItems(meetingId, updated, result.summary);
       } catch (err) {
         console.warn('Failed to update action items in Supabase:', err);
       }
@@ -136,7 +154,7 @@ ${(result.summary.key_points || []).map((p) => `- ${p}`).join('\n')}
 ${(result.summary.decisions || []).map((d) => `- ${d}`).join('\n')}
 
 ## Action Items
-${actionItems.map((a) => `- [ ] **${a.task}** (Assignee: ${a.assignee || 'Unassigned'}, Due: ${a.due_date || 'N/A'})`).join('\n')}
+${actionItems.map((a) => `- [${a.status === 'completed' ? 'x' : ' '}] **${a.task}** (Assignee: ${a.assignee || 'Unassigned'}, Due: ${a.due_date || 'N/A'})`).join('\n')}
 ${transcript ? `\n## Transcript\n${transcript}\n` : ''}`;
     navigator.clipboard.writeText(markdown);
     setCopied(true);
