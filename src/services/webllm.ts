@@ -29,7 +29,7 @@ let engineInstance: MLCEngineInterface | null = null;
 let currentLoadedModel: string | null = null;
 let engineWorker: Worker | null = null;
 
-interface NavigatorWithGPU extends Navigator {
+interface NavigatorWithGPU {
   gpu?: {
     requestAdapter: () => Promise<{
       limits?: {
@@ -41,7 +41,7 @@ interface NavigatorWithGPU extends Navigator {
 
 export function checkWebGPUSupport(): boolean {
   if (typeof navigator === 'undefined') return false;
-  const nav = navigator as NavigatorWithGPU;
+  const nav = navigator as unknown as NavigatorWithGPU;
   return Boolean('gpu' in nav && nav.gpu);
 }
 
@@ -49,7 +49,7 @@ export function checkWebGPUSupport(): boolean {
 export async function checkGPUMemory(): Promise<boolean> {
   if (!checkWebGPUSupport()) return false;
   try {
-    const nav = navigator as NavigatorWithGPU;
+    const nav = navigator as unknown as NavigatorWithGPU;
     const adapter = await nav.gpu?.requestAdapter();
     if (!adapter?.limits) return false;
     // Most adapters with limits > 512MB should handle 1B models
