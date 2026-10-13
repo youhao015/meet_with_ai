@@ -257,7 +257,9 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
             background: 'var(--glass-surface-subtle)',
             padding: '10px 18px',
             borderRadius: '14px',
-            border: '1px solid var(--glass-border)'
+            border: '1px solid var(--glass-border)',
+            alignSelf: 'flex-end',
+            minHeight: '76px'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               {isRecording ? (

@@ -1,10 +1,12 @@
 import { useState } from 'react';
-import { Mail, Lock, User, Eye, EyeOff, Sparkles, ArrowRight, RefreshCw } from 'lucide-react';
+import { Mail, Lock, User, Eye, EyeOff, Sparkles, ArrowRight, RefreshCw, Moon, Sun } from 'lucide-react';
 import { signInWithEmail, signUpWithEmail, sendPasswordReset } from '../services/auth';
+import { useTheme } from '../context/ThemeContext';
 
 type AuthMode = 'login' | 'signup' | 'reset';
 
 export function AuthPage() {
+  const { theme, toggleTheme } = useTheme();
   const [mode, setMode] = useState<AuthMode>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -64,6 +66,18 @@ export function AuthPage() {
       position: 'relative',
       overflow: 'hidden'
     }}>
+      <button
+        type="button"
+        onClick={toggleTheme}
+        aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+        className="btn-secondary"
+        style={{
+          position: 'absolute', top: '20px', right: '20px', zIndex: 1,
+          width: '40px', height: '40px', padding: 0, borderRadius: '50%'
+        }}
+      >
+        {theme === 'dark' ? <Sun size={17} color="var(--accent-amber)" /> : <Moon size={17} color="var(--accent-primary)" />}
+      </button>
       {/* Background orbs */}
       <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' }}>
         <div style={{ position: 'absolute', top: '-10%', left: '-5%', width: '500px', height: '500px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(99,102,241,0.18) 0%, transparent 70%)' }} />
@@ -76,7 +90,7 @@ export function AuthPage() {
           <Sparkles size={24} color="#ffffff" />
         </div>
         <div>
-          <span style={{ fontFamily: 'var(--font-heading)', fontSize: '24px', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.5px' }}>
+          <span style={{ fontFamily: 'var(--font-heading)', fontSize: '24px', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.5px' }}>
             MeetWith<span className="gradient-text">AI</span>
           </span>
           <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '2px 0 0' }}>
@@ -89,7 +103,7 @@ export function AuthPage() {
       <div className="glass-panel" style={{ width: '100%', maxWidth: '420px', padding: '36px 32px' }}>
         {/* Card Header */}
         <div style={{ marginBottom: '28px' }}>
-          <h1 style={{ fontFamily: 'var(--font-heading)', fontSize: '22px', fontWeight: 700, color: '#ffffff', marginBottom: '6px' }}>
+          <h1 style={{ fontFamily: 'var(--font-heading)', fontSize: '22px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '6px' }}>
             {mode === 'login' ? 'Welcome back' : mode === 'signup' ? 'Create your account' : 'Reset password'}
           </h1>
           <p style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
@@ -239,10 +253,10 @@ const inputStyle: React.CSSProperties = {
   paddingRight: '14px',
   paddingTop: '11px',
   paddingBottom: '11px',
-  background: 'rgba(15, 23, 42, 0.7)',
+  background: 'var(--input-bg)',
   border: '1px solid var(--border-subtle)',
   borderRadius: '10px',
-  color: '#ffffff',
+  color: 'var(--text-primary)',
   fontSize: '14px',
   outline: 'none',
   boxSizing: 'border-box',

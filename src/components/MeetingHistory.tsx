@@ -143,7 +143,7 @@ export const MeetingHistory: React.FC<MeetingHistoryProps> = ({ onSelectMeeting 
       ) : filteredMeetings.length === 0 ? (
         <div className="glass-panel" style={{ textAlign: 'center', padding: '60px 20px' }}>
           <Database size={36} color="#6366f1" style={{ margin: '0 auto 14px', display: 'block', opacity: 0.8 }} />
-          <h3 style={{ fontSize: '17px', color: '#ffffff', marginBottom: '6px' }}>
+          <h3 style={{ fontSize: '17px', color: 'var(--text-primary)', marginBottom: '6px' }}>
             {searchQuery ? 'No Matching Meetings' : 'No Saved Meetings Yet'}
           </h3>
           <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '420px', margin: '0 auto' }}>

@@ -6,25 +6,29 @@
 :root,
 [data-theme="dark"] {
   /* Color Palette — Deep Space Obsidian */
-  --bg-primary: #070a12;
-  --bg-secondary: #0c111d;
-  --bg-radial-1: rgba(99, 102, 241, 0.12);
-  --bg-radial-2: rgba(139, 92, 246, 0.09);
-  --bg-radial-3: rgba(6, 182, 212, 0.07);
+  --bg-primary: #090c15;
+  --bg-secondary: #111725;
+  --bg-dark: var(--bg-primary);
+  --bg-radial-1: rgba(107, 114, 255, 0.18);
+  --bg-radial-2: rgba(168, 85, 247, 0.13);
+  --bg-radial-3: rgba(34, 211, 238, 0.09);
 
   /* Liquid Glass Surfaces */
-  --glass-surface: rgba(13, 18, 30, 0.72);
-  --glass-surface-hover: rgba(20, 27, 45, 0.82);
-  --glass-surface-active: rgba(28, 38, 62, 0.92);
-  --glass-surface-subtle: rgba(255, 255, 255, 0.03);
+  --glass-surface: rgba(19, 25, 40, 0.76);
+  --glass-surface-hover: rgba(31, 39, 60, 0.9);
+  --glass-surface-active: rgba(43, 54, 82, 0.94);
+  --glass-surface-subtle: rgba(255, 255, 255, 0.045);
 
   /* iOS Specular Borders & Highlights */
-  --glass-border: rgba(255, 255, 255, 0.1);
-  --glass-border-hover: rgba(255, 255, 255, 0.22);
-  --glass-specular-top: rgba(255, 255, 255, 0.16);
+  --glass-border: rgba(255, 255, 255, 0.12);
+  --border-subtle: var(--glass-border);
+  --glass-border-hover: rgba(255, 255, 255, 0.26);
+  --glass-specular-top: rgba(255, 255, 255, 0.2);
   --glass-specular-bottom: rgba(255, 255, 255, 0.02);
-  --glass-shadow: 0 16px 40px -8px rgba(0, 0, 0, 0.55), inset 0 1px 0 var(--glass-specular-top);
-  --glass-shadow-float: 0 24px 48px -12px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  --glass-reflex-light: 0.38;
+  --glass-reflex-dark: 1.8;
+  --glass-shadow: 0 20px 50px -18px rgba(0, 0, 0, 0.72), inset 0 1px 0 var(--glass-specular-top);
+  --glass-shadow-float: 0 24px 54px -16px rgba(0, 0, 0, 0.78), inset 0 1px 0 rgba(255, 255, 255, 0.22);
 
   /* Accents & Hues */
   --accent-primary: #6366f1;
@@ -66,25 +70,29 @@
 
 [data-theme="light"] {
   /* Color Palette — Apple Alabaster / Frost Ivory */
-  --bg-primary: #f6f8fc;
+  --bg-primary: #f3f6fc;
   --bg-secondary: #ffffff;
+  --bg-dark: var(--bg-primary);
   --bg-radial-1: rgba(99, 102, 241, 0.07);
   --bg-radial-2: rgba(6, 182, 212, 0.05);
   --bg-radial-3: rgba(139, 92, 246, 0.05);
 
   /* Liquid Glass Surfaces */
-  --glass-surface: rgba(255, 255, 255, 0.82);
-  --glass-surface-hover: rgba(255, 255, 255, 0.94);
+  --glass-surface: rgba(255, 255, 255, 0.78);
+  --glass-surface-hover: rgba(255, 255, 255, 0.96);
   --glass-surface-active: #ffffff;
   --glass-surface-subtle: rgba(0, 0, 0, 0.02);
 
   /* iOS Specular Borders & Highlights */
-  --glass-border: rgba(0, 0, 0, 0.08);
+  --glass-border: rgba(15, 23, 42, 0.1);
+  --border-subtle: var(--glass-border);
   --glass-border-hover: rgba(0, 0, 0, 0.15);
   --glass-specular-top: rgba(255, 255, 255, 0.95);
   --glass-specular-bottom: rgba(0, 0, 0, 0.03);
-  --glass-shadow: 0 12px 32px -6px rgba(15, 23, 42, 0.08), inset 0 1px 0 var(--glass-specular-top);
-  --glass-shadow-float: 0 20px 40px -10px rgba(15, 23, 42, 0.14), inset 0 1px 0 rgba(255, 255, 255, 1);
+  --glass-reflex-light: 1;
+  --glass-reflex-dark: 0.7;
+  --glass-shadow: 0 18px 42px -18px rgba(32, 47, 77, 0.2), inset 0 1px 0 var(--glass-specular-top);
+  --glass-shadow-float: 0 22px 46px -14px rgba(32, 47, 77, 0.22), inset 0 1px 0 rgba(255, 255, 255, 1);
 
   /* Accents & Hues */
   --accent-primary: #4f46e5;
@@ -141,9 +149,9 @@ body {
   font-family: var(--font-body);
   background-color: var(--bg-primary);
   background-image:
-    radial-gradient(at 0% 0%, var(--bg-radial-1) 0px, transparent 55%),
-    radial-gradient(at 100% 0%, var(--bg-radial-2) 0px, transparent 55%),
-    radial-gradient(at 50% 100%, var(--bg-radial-3) 0px, transparent 60%);
+    radial-gradient(at 0% 0%, var(--bg-radial-1) 0px, transparent 52%),
+    radial-gradient(at 100% 0%, var(--bg-radial-2) 0px, transparent 48%),
+    radial-gradient(at 50% 100%, var(--bg-radial-3) 0px, transparent 58%);
   background-attachment: fixed;
   color: var(--text-primary);
   min-height: 100vh;
@@ -219,7 +227,7 @@ button:disabled {
   backdrop-filter: blur(28px) saturate(190%);
   -webkit-backdrop-filter: blur(28px) saturate(190%);
   border: 1px solid var(--glass-border);
-  border-radius: 22px;
+  border-radius: 26px;
   box-shadow: var(--glass-shadow);
   transition: all 0.28s cubic-bezier(0.16, 1, 0.3, 1);
   position: relative;
@@ -227,7 +235,7 @@ button:disabled {
 
 .glass-panel:hover {
   border-color: var(--glass-border-hover);
-  transform: translateY(-2px);
+  transform: translateY(-1px);
 }
 
 .glass-panel-subtle {
@@ -273,14 +281,51 @@ button:disabled {
   display: flex;
   align-items: center;
   gap: 6px;
-  background: var(--dock-bg);
-  backdrop-filter: blur(34px) saturate(210%);
-  -webkit-backdrop-filter: blur(34px) saturate(210%);
-  padding: 7px 10px;
-  border-radius: 40px;
-  border: 1px solid var(--dock-border);
-  box-shadow: var(--glass-shadow-float);
+  background-color: color-mix(in srgb, var(--dock-bg) 32%, transparent);
+  backdrop-filter: blur(13px) saturate(150%);
+  -webkit-backdrop-filter: blur(13px) saturate(150%);
+  padding: 8px 9px;
+  border-radius: 34px;
+  border: 1px solid color-mix(in srgb, white calc(var(--glass-reflex-light) * 52%), transparent);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, white calc(var(--glass-reflex-light) * 15%), transparent),
+    inset 2px 3px 0 -2px color-mix(in srgb, white calc(var(--glass-reflex-light) * 90%), transparent),
+    inset -2px -2px 0 -2px color-mix(in srgb, white calc(var(--glass-reflex-light) * 74%), transparent),
+    inset -3px -8px 1px -6px color-mix(in srgb, white calc(var(--glass-reflex-light) * 60%), transparent),
+    inset -0.3px -1px 4px 0 color-mix(in srgb, black calc(var(--glass-reflex-dark) * 12%), transparent),
+    inset -1.5px 2.5px 0 -2px color-mix(in srgb, black calc(var(--glass-reflex-dark) * 20%), transparent),
+    inset 0 3px 4px -2px color-mix(in srgb, black calc(var(--glass-reflex-dark) * 20%), transparent),
+    0 6px 20px color-mix(in srgb, black calc(var(--glass-reflex-dark) * 14%), transparent);
   transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.ios-dock::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  top: -70%;
+  left: -14%;
+  width: 78%;
+  height: 125%;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, color-mix(in srgb, white calc(var(--glass-reflex-light) * 90%), transparent) 0%, transparent 68%);
+  filter: blur(11px);
+  opacity: 0.8;
+  pointer-events: none;
+}
+
+.ios-dock::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: 1px;
+  border-radius: inherit;
+  border: 1px solid color-mix(in srgb, white calc(var(--glass-reflex-light) * 22%), transparent);
+  border-bottom-color: color-mix(in srgb, black calc(var(--glass-reflex-dark) * 8%), transparent);
+  pointer-events: none;
 }
 
 .ios-dock-tab {
@@ -291,7 +336,7 @@ button:disabled {
   gap: 3px;
   padding: 8px 16px;
   min-width: 68px;
-  border-radius: 28px;
+  border-radius: 24px;
   background: transparent;
   border: 1px solid transparent;
   color: var(--text-muted);
@@ -303,7 +348,7 @@ button:disabled {
 
 .ios-dock-tab:hover {
   color: var(--text-primary);
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.15);
 }
 
 .ios-dock-tab:active {
@@ -311,10 +356,15 @@ button:disabled {
 }
 
 .ios-dock-tab.active {
-  background: var(--dock-indicator);
-  border-color: var(--dock-indicator-border);
+  background-color: color-mix(in srgb, var(--dock-indicator) 32%, transparent);
+  border-color: color-mix(in srgb, white calc(var(--glass-reflex-light) * 48%), transparent);
   color: var(--accent-primary);
-  box-shadow: 0 4px 16px var(--accent-primary-glow);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, white calc(var(--glass-reflex-light) * 12%), transparent),
+    inset 2px 1px 0 -1px color-mix(in srgb, white calc(var(--glass-reflex-light) * 84%), transparent),
+    inset -1.5px -1px 0 -1px color-mix(in srgb, white calc(var(--glass-reflex-light) * 62%), transparent),
+    inset -1px 2px 3px -1px color-mix(in srgb, black calc(var(--glass-reflex-dark) * 18%), transparent),
+    0 4px 12px var(--accent-primary-glow);
 }
 
 .ios-dock-tab .dock-label {
@@ -387,7 +437,7 @@ button:disabled {
   padding: 10px 20px;
   font-size: 13.5px;
   font-weight: 600;
-  border-radius: 14px;
+  border-radius: 13px;
   border: 1px solid rgba(255, 255, 255, 0.2);
   box-shadow: 0 4px 16px var(--accent-primary-glow);
   cursor: pointer;
@@ -413,7 +463,7 @@ button:disabled {
   padding: 10px 18px;
   font-size: 13.5px;
   font-weight: 500;
-  border-radius: 14px;
+  border-radius: 13px;
   border: 1px solid var(--glass-border);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
@@ -441,7 +491,7 @@ button:disabled {
   padding: 10px 18px;
   font-size: 13.5px;
   font-weight: 600;
-  border-radius: 14px;
+  border-radius: 13px;
   border: 1px solid rgba(255, 255, 255, 0.2);
   box-shadow: 0 4px 18px var(--accent-rose-glow);
   cursor: pointer;
