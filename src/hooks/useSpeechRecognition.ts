@@ -192,12 +192,12 @@ export function useSpeechRecognition(): UseSpeechRecognitionReturn {
 
         if (shouldListenRef.current) {
           clearRestartTimer();
-          // Resilient restart after 60ms pause
+          // Resilient restart after 300ms pause so browser audio subsystem cleanly releases
           restartTimerRef.current = setTimeout(() => {
             if (shouldListenRef.current) {
               sessionRunnerRef.current();
             }
-          }, 60);
+          }, 300);
         } else {
           setIsListening(false);
         }
@@ -207,15 +207,16 @@ export function useSpeechRecognition(): UseSpeechRecognitionReturn {
       recognition.start();
       setIsListening(true);
       setSpeechError(null);
-    } catch {
-      // In case start() fails (e.g. busy state), retry shortly if user still wants to listen
+    } catch (err: unknown) {
+      console.warn('[SpeechRecognition.start notice]:', err);
+      // In case start() fails (e.g. busy state), retry with 350ms backoff if user still wants to listen
       if (shouldListenRef.current) {
         clearRestartTimer();
         restartTimerRef.current = setTimeout(() => {
           if (shouldListenRef.current) {
             sessionRunnerRef.current();
           }
-        }, 250);
+        }, 350);
       }
     }
   }, [flushInterimToTranscript]);

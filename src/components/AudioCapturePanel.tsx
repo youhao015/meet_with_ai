@@ -59,6 +59,11 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
     setTranscript
   } = useSpeechRecognition();
 
+  // Combine committed transcript with real-time interim speech so spoken words appear instantly in the transcript area
+  const liveTranscript = isListening && interimTranscript
+    ? (transcript ? `${transcript} ${interimTranscript}` : interimTranscript)
+    : transcript;
+
   const {
     isRecording,
     recordingDuration,
@@ -133,12 +138,7 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
       // 1. Establish hardware capture (for system mode, prompts user to select tab/screen first)
       await startRecording(mode);
 
-      // 2. Pre-connect speech recognition API endpoint
-      if (isSpeechSupported) {
-        startListening();
-      }
-
-      // 3. Count down 3 -> 2 -> 1 to give the transcript API endpoint buffer time to stabilize
+      // 2. Count down 3 -> 2 -> 1 to give the user buffer time to prepare
       for (let count = 3; count >= 1; count--) {
         if (countdownAbortRef.current) break;
         setCountdown(count);
@@ -146,6 +146,11 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
       }
 
       setCountdown(null);
+
+      // 3. Connect and start speech recognition right as countdown finishes so speech is immediately heard
+      if (isSpeechSupported && !countdownAbortRef.current) {
+        startListening();
+      }
     } catch (err: unknown) {
       setCountdown(null);
       stopListening();
@@ -680,7 +685,7 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
         <textarea
           id="transcript-textarea"
           aria-label="Meeting transcript or notes"
-          value={transcript}
+          value={liveTranscript}
           onChange={(e) => setTranscript(e.target.value)}
           placeholder={
             isSpeechSupported
@@ -705,7 +710,7 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
         />
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '12px', fontSize: '12px', color: 'var(--text-muted)' }}>
-          <span>Word count: {transcript ? transcript.split(/\s+/).filter(Boolean).length : 0} words</span>
+          <span>Word count: {liveTranscript ? liveTranscript.split(/\s+/).filter(Boolean).length : 0} words</span>
         </div>
       </div>
     </div>
