@@ -196,7 +196,7 @@ export const AnalyticsWidgets: React.FC = () => {
         <div className="glass-panel" style={{ padding: '20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
             <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
-              Vault Sessions
+              {t.insights.vaultSessions}
             </span>
             <div style={{
               width: '32px', height: '32px', borderRadius: '10px',
@@ -210,7 +210,11 @@ export const AnalyticsWidgets: React.FC = () => {
             {isLoading ? '…' : meetings.length}
           </div>
           <span style={{ fontSize: '11.5px', color: meetings.length > 0 ? 'var(--accent-emerald)' : 'var(--text-muted)', fontWeight: 600 }}>
-            {meetings.length === 1 ? '1 recorded session' : `${meetings.length} recorded sessions`}
+            {language === 'zh'
+              ? `${meetings.length} ${t.insights.sessionPlural}`
+              : meetings.length === 1
+              ? t.insights.sessionSingular
+              : `${meetings.length} ${t.insights.sessionPlural}`}
           </span>
         </div>
 
@@ -218,7 +222,7 @@ export const AnalyticsWidgets: React.FC = () => {
         <div className="glass-panel" style={{ padding: '20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
             <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
-              Recorded Time
+              {t.insights.recordedTime}
             </span>
             <div style={{
               width: '32px', height: '32px', borderRadius: '10px',
@@ -229,10 +233,10 @@ export const AnalyticsWidgets: React.FC = () => {
             </div>
           </div>
           <div style={{ fontSize: '28px', fontWeight: 800, color: 'var(--text-primary)', fontFamily: 'var(--font-heading)' }}>
-            {isLoading ? '…' : totalMinutes} <span style={{ fontSize: '16px', fontWeight: 500, color: 'var(--text-muted)' }}>min</span>
+            {isLoading ? '…' : totalMinutes} <span style={{ fontSize: '16px', fontWeight: 500, color: 'var(--text-muted)' }}>{t.insights.minUnit}</span>
           </div>
           <span style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
-            Average: {avgMinutes}m / session
+            {t.insights.avgPerSession.replace('{m}', String(avgMinutes))}
           </span>
         </div>
 
@@ -240,7 +244,7 @@ export const AnalyticsWidgets: React.FC = () => {
         <div className="glass-panel" style={{ padding: '20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
             <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
-              Insight Tasks
+              {t.insights.insightTasks}
             </span>
             <div style={{
               width: '32px', height: '32px', borderRadius: '10px',
@@ -251,10 +255,10 @@ export const AnalyticsWidgets: React.FC = () => {
             </div>
           </div>
           <div style={{ fontSize: '28px', fontWeight: 800, color: 'var(--text-primary)', fontFamily: 'var(--font-heading)' }}>
-            {isLoading ? '…' : tasks.length} <span style={{ fontSize: '16px', fontWeight: 500, color: 'var(--text-muted)' }}>total</span>
+            {isLoading ? '…' : tasks.length} <span style={{ fontSize: '16px', fontWeight: 500, color: 'var(--text-muted)' }}>{t.insights.totalUnit}</span>
           </div>
           <span style={{ fontSize: '11.5px', color: 'var(--accent-purple)', fontWeight: 600 }}>
-            {pendingCount} pending completion
+            {pendingCount} {t.insights.pendingCompletion}
           </span>
         </div>
 
@@ -262,7 +266,7 @@ export const AnalyticsWidgets: React.FC = () => {
         <div className="glass-panel" style={{ padding: '20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
             <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
-              Completion Rate
+              {t.insights.completionRate}
             </span>
             <div style={{
               width: '32px', height: '32px', borderRadius: '10px',
@@ -276,7 +280,9 @@ export const AnalyticsWidgets: React.FC = () => {
             {isLoading ? '…' : `${completionPercent}%`}
           </div>
           <span style={{ fontSize: '11.5px', color: 'var(--accent-emerald)', fontWeight: 600 }}>
-            {completedCount} of {tasks.length} resolved
+            {language === 'zh'
+              ? `${completedCount} / ${tasks.length} ${t.insights.resolvedOf}`
+              : `${completedCount} of ${tasks.length} ${t.insights.resolvedOf}`}
           </span>
         </div>
       </div>
@@ -286,15 +292,15 @@ export const AnalyticsWidgets: React.FC = () => {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '10px' }}>
           <div>
             <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)' }}>
-              Weekly Meeting Volume
+              {t.insights.weeklyVolume}
             </h3>
             <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-              Minutes recorded per day across your calendar
+              {t.insights.weeklyDesc}
             </p>
           </div>
           <span className="badge badge-source" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
             <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 8px #10b981' }} />
-            7-Day Activity
+            {t.insights.sevenDayActivity}
           </span>
         </div>
 
@@ -346,7 +352,7 @@ export const AnalyticsWidgets: React.FC = () => {
                     zIndex: 30,
                     pointerEvents: 'none'
                   }}>
-                    {item.dateStr}: {item.minutes}m ({item.count} session{item.count !== 1 ? 's' : ''})
+                    {item.dateStr}: {item.minutes}{t.insights.minUnit} ({item.count} {language === 'zh' ? '场会议' : item.count !== 1 ? 'sessions' : 'session'})
                   </div>
                 )}
 
@@ -360,7 +366,7 @@ export const AnalyticsWidgets: React.FC = () => {
                   color: item.minutes > 0 ? 'var(--accent-primary)' : 'var(--text-muted)',
                   transition: 'all 0.2s ease'
                 }}>
-                  {item.minutes > 0 ? `${item.minutes}m` : '0m'}
+                  {item.minutes > 0 ? `${item.minutes}${t.insights.minUnit}` : `0${t.insights.minUnit}`}
                 </span>
 
                 {/* Equalizer track column */}
@@ -410,7 +416,7 @@ export const AnalyticsWidgets: React.FC = () => {
         </div>
 
         <div style={{ marginTop: '12px', fontSize: '11.5px', color: 'var(--text-muted)' }}>
-          <span>Total 7-day volume: {weeklyActivity.reduce((acc, d) => acc + d.minutes, 0)} min ({weeklyActivity.reduce((acc, d) => acc + d.count, 0)} session{weeklyActivity.reduce((acc, d) => acc + d.count, 0) !== 1 ? 's' : ''})</span>
+          <span>{t.insights.totalSevenDay}: {weeklyActivity.reduce((acc, d) => acc + d.minutes, 0)} {t.insights.minUnit} ({weeklyActivity.reduce((acc, d) => acc + d.count, 0)} {language === 'zh' ? '场会议' : weeklyActivity.reduce((acc, d) => acc + d.count, 0) !== 1 ? 'sessions' : 'session'})</span>
         </div>
       </div>
 
@@ -429,11 +435,11 @@ export const AnalyticsWidgets: React.FC = () => {
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <ListTodo size={20} color="var(--accent-purple)" />
               <h2 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'var(--font-heading)' }}>
-                Action Items &amp; Deliverables Table
+                {t.insights.tableTitle}
               </h2>
             </div>
             <p style={{ fontSize: '12.5px', color: 'var(--text-muted)', marginTop: '2px' }}>
-              Dedicated task manager for your insights, projects, and deliverables
+              {t.insights.tableSubtitle}
             </p>
           </div>
 
@@ -454,7 +460,7 @@ export const AnalyticsWidgets: React.FC = () => {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search deliverables..."
+                placeholder={t.insights.searchPlaceholder}
                 style={{
                   background: 'transparent',
                   border: 'none',
@@ -491,7 +497,7 @@ export const AnalyticsWidgets: React.FC = () => {
                   transition: 'all 0.15s ease'
                 }}
               >
-                All ({tasks.length})
+                {t.insights.filterAll} ({tasks.length})
               </button>
               <button
                 type="button"
@@ -508,7 +514,7 @@ export const AnalyticsWidgets: React.FC = () => {
                   transition: 'all 0.15s ease'
                 }}
               >
-                Pending ({pendingCount})
+                {t.insights.filterPending} ({pendingCount})
               </button>
               <button
                 type="button"
@@ -525,7 +531,7 @@ export const AnalyticsWidgets: React.FC = () => {
                   transition: 'all 0.15s ease'
                 }}
               >
-                Done ({completedCount})
+                {t.insights.filterDone} ({completedCount})
               </button>
             </div>
           </div>
@@ -549,7 +555,7 @@ export const AnalyticsWidgets: React.FC = () => {
             type="text"
             value={newTaskText}
             onChange={(e) => setNewTaskText(e.target.value)}
-            placeholder="Add new action item or deliverable..."
+            placeholder={t.insights.addTaskPlaceholder}
             disabled={isSubmitting}
             style={{
               flex: '2 1 240px',
@@ -568,7 +574,7 @@ export const AnalyticsWidgets: React.FC = () => {
             type="text"
             value={newAssignee}
             onChange={(e) => setNewAssignee(e.target.value)}
-            placeholder="Assignee (opt)"
+            placeholder={t.insights.assigneePlaceholder}
             disabled={isSubmitting}
             style={{
               flex: '1 1 120px',
@@ -587,7 +593,7 @@ export const AnalyticsWidgets: React.FC = () => {
             type="date"
             value={newDueDate}
             onChange={(e) => setNewDueDate(e.target.value)}
-            title="Target due date"
+            title={t.insights.targetDueDate}
             disabled={isSubmitting}
             style={{
               width: '135px',
@@ -616,7 +622,7 @@ export const AnalyticsWidgets: React.FC = () => {
             }}
           >
             <Plus size={15} />
-            {isSubmitting ? 'Adding…' : 'Add Deliverable'}
+            {isSubmitting ? t.insights.addingDeliverable : t.insights.btnAddDeliverable}
           </button>
         </form>
 
@@ -625,18 +631,18 @@ export const AnalyticsWidgets: React.FC = () => {
           <table className="insight-table">
             <thead>
               <tr>
-                <th style={{ width: '130px' }}>Status</th>
-                <th>Deliverable / Task</th>
-                <th style={{ width: '160px' }}>Assignee</th>
-                <th style={{ width: '140px' }}>Due Date</th>
-                <th style={{ width: '70px', textAlign: 'center' }}>Action</th>
+                <th style={{ width: '130px' }}>{t.insights.colStatus}</th>
+                <th>{t.insights.colTask}</th>
+                <th style={{ width: '160px' }}>{t.insights.colAssignee}</th>
+                <th style={{ width: '140px' }}>{t.insights.colDueDate}</th>
+                <th style={{ width: '70px', textAlign: 'center' }}>{t.insights.colAction}</th>
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
                 <tr>
                   <td colSpan={5} style={{ textAlign: 'center', padding: '36px', color: 'var(--text-muted)' }}>
-                    Querying insight tasks database…
+                    {t.insights.queryingDatabase}
                   </td>
                 </tr>
               ) : filteredTasks.length === 0 ? (
@@ -646,10 +652,12 @@ export const AnalyticsWidgets: React.FC = () => {
                       <AlertCircle size={22} style={{ opacity: 0.7 }} />
                       <span style={{ fontSize: '13px' }}>
                         {searchQuery
-                          ? `No deliverables match "${searchQuery}".`
+                          ? (language === 'zh' ? `未找到匹配 "${searchQuery}" 的事项。` : t.insights.noMatchSearch.replace('{query}', searchQuery))
                           : filterStatus !== 'all'
-                          ? `No ${filterStatus} action items found.`
-                          : 'No action items recorded yet in the Insight table. Add your first deliverable above.'}
+                          ? (language === 'zh'
+                              ? `暂无${filterStatus === 'pending' ? '待处理' : '已完成'}的行动项。`
+                              : t.insights.noFilterMatch.replace('{status}', filterStatus))
+                          : t.insights.noTasksRecorded}
                       </span>
                     </div>
                   </td>
@@ -687,7 +695,7 @@ export const AnalyticsWidgets: React.FC = () => {
                             letterSpacing: '0.4px',
                             color: isDone ? 'var(--accent-emerald)' : 'var(--accent-purple)'
                           }}>
-                            {isDone ? 'Done' : 'Pending'}
+                            {isDone ? t.insights.statusDone : t.insights.statusPending}
                           </span>
                         </div>
                       </td>
@@ -738,11 +746,11 @@ export const AnalyticsWidgets: React.FC = () => {
                             color: 'var(--text-secondary)'
                           }}>
                             <Calendar size={12} color="var(--text-muted)" />
-                            {new Date(item.due_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                            {new Date(item.due_date).toLocaleDateString(language === 'zh' ? 'zh-CN' : undefined, { month: 'short', day: 'numeric' })}
                           </span>
                         ) : (
                           <span style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
-                            {new Date(item.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                            {new Date(item.created_at).toLocaleDateString(language === 'zh' ? 'zh-CN' : undefined, { month: 'short', day: 'numeric' })}
                           </span>
                         )}
                       </td>
@@ -767,7 +775,7 @@ export const AnalyticsWidgets: React.FC = () => {
                           }}
                           onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--accent-rose)')}
                           onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
-                          title="Delete deliverable"
+                          title={t.insights.deleteTooltip}
                         >
                           <Trash2 size={13} />
                         </button>

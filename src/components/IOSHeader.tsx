@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Sun, Moon, LogOut, ChevronDown, User, Radio, Languages } from 'lucide-react';
+import { Sun, Moon, LogOut, ChevronDown, User, Radio } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
@@ -18,7 +18,7 @@ export const IOSHeader: React.FC<IOSHeaderProps> = ({
 }) => {
   const { theme, toggleTheme } = useTheme();
   const { user, logout } = useAuth();
-  const { language, toggleLanguage, t } = useLanguage();
+  const { language, t } = useLanguage();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -139,36 +139,8 @@ export const IOSHeader: React.FC<IOSHeaderProps> = ({
           ) : null}
         </div>
 
-        {/* Right: Language Switcher, Theme Toggle & Profile Menu */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          {/* iOS Multilingual Switcher Widget */}
-          <button
-            id="header-language-toggle"
-            onClick={toggleLanguage}
-            className="btn-secondary"
-            style={{
-              height: '36px',
-              padding: '0 10px',
-              borderRadius: '18px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              cursor: 'pointer',
-              fontSize: '12px',
-              fontWeight: 600,
-              color: 'var(--text-primary)',
-              transition: 'all 0.2s ease',
-              userSelect: 'none'
-            }}
-            title={language === 'en' ? t.header.switchLanguageToZh : t.header.switchLanguageToEn}
-            aria-label="Switch Language / 切换语言"
-          >
-            <Languages size={15} color="var(--accent-primary)" />
-            <span style={{ letterSpacing: '0.2px' }}>
-              {language === 'en' ? 'EN' : '中文'}
-            </span>
-          </button>
-
+        {/* Right: Theme Toggle & Profile Menu */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           {/* iOS Theme Switcher */}
           <button
             onClick={toggleTheme}

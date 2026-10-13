@@ -76,28 +76,55 @@ async function uploadAudio(blob: Blob, title: string): Promise<string | undefine
   }
 }
 
+// ── Language Detection Helper ───────────────────────────────────────────────
+
+export function isChineseTranscript(text: string): boolean {
+  if (!text) return false;
+  const hanMatch = text.match(/[\u4e00-\u9fa5]/g);
+  const hanCount = hanMatch ? hanMatch.length : 0;
+  const nonSpaceLength = text.replace(/\s+/g, '').length;
+  return hanCount >= 5 || (nonSpaceLength > 0 && hanCount / nonSpaceLength >= 0.10);
+}
+
 // ── Strict Prompt Builder ───────────────────────────────────────────────────
 
 function buildExecutivePrompt(transcript: string, title: string): string {
+  const isZh = isChineseTranscript(transcript);
+
+  const languageDirective = isZh
+    ? `MANDATORY LANGUAGE RULE:
+The meeting transcript is in CHINESE (中文).
+You MUST generate ALL fields of the summary strictly in fluent, natural Simplified Chinese (简体中文):
+- "overview": 必须使用中文撰写清晰凝练的高管核心概览（2-4句话，概括会议主题、核心背景和最终成果）。
+- "key_points": 每一个要点必须使用中文撰写。
+- "decisions": 每一项达成的决议必须使用中文撰写（若无明确决议则保持空数组 []）。
+- "action_items": 任务内容 ("task") 和负责人 ("assignee"，如未明确指派则填 "未指定") 必须使用中文撰写。
+Do NOT translate into English. Preserve any original English technical acronyms or specific names (e.g. AI, API, Supabase) as-is.`
+    : `MANDATORY LANGUAGE RULE:
+The meeting transcript is in ENGLISH.
+You MUST generate ALL fields of the summary strictly in English.`;
+
   return `You are a world-class executive meeting intelligence analyst.
 Analyze the following meeting transcript and produce a structured, high-value, and 100% ACCURATE executive summary.
+
+${languageDirective}
 
 STRICT ACCURACY & LOGIC RULES:
 1. Executive Overview: Synthesize a cohesive 2-4 sentence summary of the session's core purpose, context, and key takeaway.
 2. Key Discussion Points: Provide clear, coherent bullet points of the substantive topics discussed. Do NOT output raw transcript fragments or sentence splices.
 3. Decisions Concluded: Output ONLY decisions that were explicitly agreed upon, resolved, or approved. IF NO EXPLICIT DECISIONS WERE CONCLUDED, RETURN AN EMPTY ARRAY []. NEVER fabricate generic decisions.
-4. Assigned Action Items & Deliverables: Extract real tasks and identify the actual person or organization responsible. The assignee must be an actual entity, NOT filler words like "The" or "Meanwhile". If no assignee is mentioned, use "Unassigned". If no action items exist in the transcript, return an empty array [].
+4. Assigned Action Items & Deliverables: Extract real tasks and identify the actual person or organization responsible. The assignee must be an actual entity, NOT filler words like "The" or "Meanwhile". If no assignee is mentioned, use ${isZh ? '"未指定"' : '"Unassigned"'}. If no action items exist in the transcript, return an empty array [].
 
 Respond ONLY with a valid JSON object matching this schema:
 {
-  "overview": "Concise executive overview",
-  "key_points": ["Substantive discussion point 1", "Substantive discussion point 2"],
-  "decisions": ["Specific decision concluded (or leave array empty [] if none)"],
+  "overview": "${isZh ? '凝练的高管核心概览 (2-4句话)' : 'Concise executive overview'}",
+  "key_points": [${isZh ? '"实质性讨论要点1", "实质性讨论要点2"' : '"Substantive discussion point 1", "Substantive discussion point 2"'}],
+  "decisions": [${isZh ? '"已达成一致的决议项 (若无则返回空数组 [])"' : '"Specific decision concluded (or leave array empty [] if none)"'}],
   "action_items": [
     {
-      "task": "Concrete actionable deliverable",
-      "assignee": "Responsible person or organization (or 'Unassigned')",
-      "due_date": "Target timeframe if mentioned"
+      "task": "${isZh ? '明确可执行的任务交付物' : 'Concrete actionable deliverable'}",
+      "assignee": "${isZh ? '实际负责的个人或团队 (若未提及填 未指定)' : "Responsible person or organization (or 'Unassigned')"}",
+      "due_date": "${isZh ? '截止日期或时间' : 'Target timeframe if mentioned'}"
     }
   ]
 }
@@ -109,7 +136,7 @@ ${transcript.slice(0, 100_000)}
 """`;
 }
 
-function validateSummaryData(parsed: Partial<SummaryData>): SummaryData {
+function validateSummaryData(parsed: Partial<SummaryData>, isZh: boolean = false): SummaryData {
   const key_points = Array.isArray(parsed.key_points) && parsed.key_points.length > 0
     ? parsed.key_points.filter((k) => typeof k === 'string' && k.trim().length > 0)
     : [];
@@ -119,6 +146,8 @@ function validateSummaryData(parsed: Partial<SummaryData>): SummaryData {
     ? parsed.decisions.filter((d) => typeof d === 'string' && d.trim().length > 0)
     : [];
 
+  const defaultAssignee = isZh ? '未指定' : 'Unassigned';
+
   const action_items = Array.isArray(parsed.action_items) && parsed.action_items.length > 0
     ? parsed.action_items
         .filter((item) => item && typeof item.task === 'string' && item.task.trim().length > 0)
@@ -126,18 +155,18 @@ function validateSummaryData(parsed: Partial<SummaryData>): SummaryData {
           let assignee = (item.assignee || '').trim();
           // Remove filler grammatical words wrongly parsed as names
           if (/^(the|meanwhile|then|and|also|a|an|in|on|at|by|for|with)$/i.test(assignee)) {
-            assignee = 'Unassigned';
+            assignee = defaultAssignee;
           }
           return {
             task: item.task.trim(),
-            assignee: assignee || 'Unassigned',
+            assignee: assignee || defaultAssignee,
             due_date: (item.due_date || '').trim() || undefined
           };
         })
     : [];
 
   return {
-    overview: parsed.overview?.trim() || 'Summary synthesized from meeting transcript.',
+    overview: parsed.overview?.trim() || (isZh ? '已完成会议记录并提炼核心纪要。' : 'Summary synthesized from meeting transcript.'),
     key_points,
     decisions,
     action_items
@@ -193,8 +222,9 @@ async function callGeminiSummarize(
         .replace(/\s*```\s*$/i, '')
         .trim();
 
+      const isZh = isChineseTranscript(transcript);
       const parsed = JSON.parse(clean) as Partial<SummaryData>;
-      return validateSummaryData(parsed);
+      return validateSummaryData(parsed, isZh);
     } catch (err) {
       clearTimeout(timeoutId);
       lastError = err instanceof Error ? err.message : String(err);
@@ -263,8 +293,9 @@ async function callGroqSummarize(
         .replace(/\s*```\s*$/i, '')
         .trim();
 
+      const isZh = isChineseTranscript(transcript);
       const parsed = JSON.parse(clean) as Partial<SummaryData>;
-      return validateSummaryData(parsed);
+      return validateSummaryData(parsed, isZh);
     } catch (err) {
       clearTimeout(timeoutId);
       lastError = err instanceof Error ? err.message : String(err);
@@ -350,12 +381,23 @@ async function callLocalSummarize(
 // ── Client-side Failsafe Heuristic ───────────────────────────────────────────
 
 function clientHeuristicSummarize(transcript: string, title?: string): SummaryData {
+  const isZh = isChineseTranscript(transcript);
+  const splitRegex = isZh ? /(?<=[。！？\n])\s*/ : /(?<=[.!?])\s+/;
   const sentences = transcript
-    .split(/(?<=[.!?])\s+/)
+    .split(splitRegex)
     .map((s) => s.trim())
-    .filter((s) => s.length > 25);
+    .filter((s) => s.length > (isZh ? 8 : 25));
 
   const key_points = sentences.slice(0, 6);
+
+  if (isZh) {
+    return {
+      overview: `会议“${title || '未命名会议'}”包含 ${sentences.length} 段讨论要点，已完成智能归档与分析。`,
+      key_points: key_points.length > 0 ? key_points : ['记录了会议相关讨论要点。'],
+      decisions: [],
+      action_items: []
+    };
+  }
 
   return {
     overview: `Session "${title || 'Meeting'}" covered ${sentences.length} recorded discussion segments regarding scheduled topics.`,

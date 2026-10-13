@@ -192,13 +192,19 @@ async function streamCompletion(
 }
 
 function buildSummarizePrompt(transcript: string, title: string): string {
+  const isZh = (transcript.match(/[\u4e00-\u9fa5]/g) || []).length >= 5;
+  const langRule = isZh
+    ? `LANGUAGE REQUIREMENT: The transcript is in Chinese. You MUST output all fields ("overview", "key_points", "decisions", "action_items") strictly in Simplified Chinese (简体中文). Do NOT translate into English.`
+    : `LANGUAGE REQUIREMENT: The transcript is in English. You MUST output all fields strictly in English.`;
+
   return `You are an expert AI executive meeting summarizer. Analyze this meeting transcript and output ONLY valid JSON matching this exact structure (no markdown, no code fences):
+${langRule}
 {
-  "overview": "Concise executive overview (2-3 sentences)",
-  "key_points": ["Key discussion point 1", "Key discussion point 2"],
-  "decisions": ["Decision 1", "Decision 2"],
+  "overview": "${isZh ? '凝练的核心概述 (2-3句话)' : 'Concise executive overview (2-3 sentences)'}",
+  "key_points": [${isZh ? '"讨论要点1", "讨论要点2"' : '"Key discussion point 1", "Key discussion point 2"'}],
+  "decisions": [${isZh ? '"决策1", "决策2"' : '"Decision 1", "Decision 2"'}],
   "action_items": [
-    { "task": "Specific actionable task", "assignee": "Person or Team", "due_date": "YYYY-MM-DD or timeframe" }
+    { "task": "${isZh ? '具体行动任务' : 'Specific actionable task'}", "assignee": "${isZh ? '负责人' : 'Person or Team'}", "due_date": "YYYY-MM-DD" }
   ]
 }
 

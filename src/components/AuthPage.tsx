@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Mail, Lock, User, Eye, EyeOff, Sparkles, ArrowRight, RefreshCw, Moon, Sun, Languages } from 'lucide-react';
+import { Mail, Lock, User, Eye, EyeOff, Sparkles, ArrowRight, RefreshCw, Moon, Sun } from 'lucide-react';
 import { signInWithEmail, signUpWithEmail, sendPasswordReset } from '../services/auth';
 import { useTheme } from '../context/ThemeContext';
 import { useLanguage } from '../context/LanguageContext';
@@ -8,7 +8,7 @@ type AuthMode = 'login' | 'signup' | 'reset';
 
 export function AuthPage() {
   const { theme, toggleTheme } = useTheme();
-  const { language, toggleLanguage, t } = useLanguage();
+  const { t } = useLanguage();
   const [mode, setMode] = useState<AuthMode>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -82,44 +82,21 @@ export function AuthPage() {
       position: 'relative',
       overflow: 'hidden'
     }}>
-      {/* Top Controls: Language & Theme Toggle */}
-      <div style={{
-        position: 'absolute', top: '20px', right: '20px', zIndex: 10,
-        display: 'flex', alignItems: 'center', gap: '8px'
-      }}>
-        <button
-          type="button"
-          id="auth-language-toggle"
-          onClick={toggleLanguage}
-          aria-label="Switch Language / 切换语言"
-          className="btn-secondary"
-          style={{
-            height: '36px', padding: '0 10px', borderRadius: '18px',
-            display: 'flex', alignItems: 'center', gap: '6px',
-            fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)',
-            cursor: 'pointer'
-          }}
-          title={language === 'en' ? t.header.switchLanguageToZh : t.header.switchLanguageToEn}
-        >
-          <Languages size={15} color="var(--accent-primary)" />
-          <span>{language === 'en' ? 'EN' : '中文'}</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={toggleTheme}
-          aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-          className="btn-secondary"
-          style={{
-            width: '36px', height: '36px', padding: 0, borderRadius: '50%',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: 'pointer'
-          }}
-          title={theme === 'dark' ? t.header.switchThemeToLight : t.header.switchThemeToDark}
-        >
-          {theme === 'dark' ? <Sun size={16} color="var(--accent-amber)" /> : <Moon size={16} color="var(--accent-primary)" />}
-        </button>
-      </div>
+      <button
+        type="button"
+        onClick={toggleTheme}
+        aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+        className="btn-secondary"
+        style={{
+          position: 'absolute', top: '20px', right: '20px', zIndex: 10,
+          width: '36px', height: '36px', padding: 0, borderRadius: '50%',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          cursor: 'pointer'
+        }}
+        title={theme === 'dark' ? t.header.switchThemeToLight : t.header.switchThemeToDark}
+      >
+        {theme === 'dark' ? <Sun size={16} color="var(--accent-amber)" /> : <Moon size={16} color="var(--accent-primary)" />}
+      </button>
       {/* Background orbs */}
       <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' }}>
         <div style={{ position: 'absolute', top: '-10%', left: '-5%', width: '500px', height: '500px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(99,102,241,0.18) 0%, transparent 70%)' }} />

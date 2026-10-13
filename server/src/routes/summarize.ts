@@ -27,19 +27,28 @@ const SITE_NAME = 'MeetWithAI';
 
 // ── Heuristic fallback ────────────────────────────────────────────────────────
 
+function isChineseText(text: string): boolean {
+  if (!text) return false;
+  const hanChars = (text.match(/[\u4e00-\u9fa5]/g) || []).length;
+  const nonWhitespace = text.replace(/\s+/g, '').length;
+  return hanChars >= 5 || (nonWhitespace > 0 && hanChars / nonWhitespace >= 0.10);
+}
+
 function heuristicSummarize(transcript: string, title?: string): SummaryResult {
+  const isZh = isChineseText(transcript);
+  const splitRegex = isZh ? /\r?\n|[。！？]+/ : /\r?\n|[.!?]+/;
   const lines = transcript
-    .split(/\r?\n|[.!?]+/)
+    .split(splitRegex)
     .map((s) => s.trim())
     .filter(Boolean);
 
-  const actionKeywords = [
-    'will', 'need to', 'must', 'action', 'todo', 'follow up',
-    'assign', 'by tomorrow', 'by friday', 'schedule', 'review', 'please'
-  ];
-  const decisionKeywords = [
-    'decided', 'agreed', 'decision', 'concluded', 'approved', 'chosen', 'finalized', 'resolved'
-  ];
+  const actionKeywords = isZh
+    ? ['需要', '必须', '负责', '跟进', '安排', '待办', '计划', '完成', '提交', '对接']
+    : ['will', 'need to', 'must', 'action', 'todo', 'follow up', 'assign', 'by tomorrow', 'by friday', 'schedule', 'review', 'please'];
+
+  const decisionKeywords = isZh
+    ? ['决定', '同意', '通过', '确认', '定下', '决议', '批准', '确定']
+    : ['decided', 'agreed', 'decision', 'concluded', 'approved', 'chosen', 'finalized', 'resolved'];
 
   const action_items: SummaryResult['action_items'] = [];
   const decisions: string[] = [];
@@ -52,16 +61,34 @@ function heuristicSummarize(transcript: string, title?: string): SummaryResult {
       if (decisions.length < 8) decisions.push(line);
     } else if (actionKeywords.some((k) => lower.includes(k))) {
       if (action_items.length < 10) {
-        const assigneeMatch = line.match(/\b([A-Z][a-z]{2,})\b/);
+        const assigneeMatch = isZh ? null : line.match(/\b([A-Z][a-z]{2,})\b/);
         action_items.push({
           task: line,
-          assignee: assigneeMatch ? assigneeMatch[1] : 'Unassigned',
+          assignee: assigneeMatch ? assigneeMatch[1] : (isZh ? '团队成员' : 'Unassigned'),
           due_date: new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString().split('T')[0]
         });
       }
-    } else if (key_points.length < 6 && line.length > 25) {
+    } else if (key_points.length < 6 && line.length > (isZh ? 10 : 25)) {
       key_points.push(line);
     }
+  }
+
+  if (isZh) {
+    return {
+      overview: `会议“${title || '会议纪要'}”包含 ${lines.length} 段讨论要点，已智能归纳重点事项与行动项。`,
+      key_points: key_points.length > 0 ? key_points : ['回顾了项目路线图与关键里程碑。'],
+      decisions: decisions.length > 0 ? decisions : ['同意按既定计划推进交付。'],
+      action_items:
+        action_items.length > 0
+          ? action_items
+          : [
+              {
+                task: '跟进落实本次会议确定的事项',
+                assignee: '负责人',
+                due_date: new Date().toISOString().split('T')[0]
+              }
+            ]
+    };
   }
 
   return {
@@ -84,18 +111,30 @@ function heuristicSummarize(transcript: string, title?: string): SummaryResult {
 // ── Build prompt ──────────────────────────────────────────────────────────────
 
 function buildPrompt(transcript: string, title: string): string {
+  const isZh = isChineseText(transcript);
+  const langRule = isZh
+    ? `CRITICAL LANGUAGE REQUIREMENT:
+The transcript is in CHINESE (中文).
+You MUST write all output fields ("overview", "key_points", "decisions", "action_items.task", "action_items.assignee") strictly in fluent, natural Simplified Chinese (简体中文). Do NOT translate into English.`
+    : `CRITICAL LANGUAGE REQUIREMENT:
+The transcript is in ENGLISH.
+You MUST write all output fields strictly in English.`;
+
   return `You are an expert executive meeting assistant.
 Analyze the following meeting transcript and produce a structured, high-value executive summary.
+
+${langRule}
+
 Respond ONLY with a valid JSON object matching this schema exactly:
 {
-  "overview": "Concise executive overview (2-4 clear sentences highlighting the main purpose, tone, and final conclusion)",
-  "key_points": ["Key discussion point 1", "Key discussion point 2"],
-  "decisions": ["Final decision or agreement 1", "Final decision 2"],
+  "overview": "${isZh ? '凝练的高管核心概览 (2-4句话)' : 'Concise executive overview (2-4 clear sentences highlighting the main purpose, tone, and final conclusion)'}",
+  "key_points": [${isZh ? '"讨论要点1", "讨论要点2"' : '"Key discussion point 1", "Key discussion point 2"'}],
+  "decisions": [${isZh ? '"已达成一致的决议项 (若无则返回空数组 [])"' : '"Final decision or agreement 1", "Final decision 2"'}],
   "action_items": [
     {
-      "task": "Concrete actionable task description",
-      "assignee": "Person, role, or team responsible",
-      "due_date": "Target date or timeframe if mentioned, otherwise leave as Ongoing or Soon"
+      "task": "${isZh ? '具体可执行的任务描述' : 'Concrete actionable task description'}",
+      "assignee": "${isZh ? '实际负责的个人或团队' : 'Person, role, or team responsible'}",
+      "due_date": "${isZh ? '目标时间' : 'Target date or timeframe if mentioned, otherwise leave as Ongoing or Soon'}"
     }
   ]
 }
