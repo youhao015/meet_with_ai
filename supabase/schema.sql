@@ -54,11 +54,24 @@ CREATE TABLE IF NOT EXISTS public.oauth_tokens (
   CONSTRAINT unique_user_provider UNIQUE(user_id, provider)
 );
 
+-- 5. Insight Tasks Table (Dedicated independent task manager for the Insight page)
+CREATE TABLE IF NOT EXISTS public.insight_tasks (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  task TEXT NOT NULL,
+  assignee TEXT,
+  due_date TIMESTAMPTZ,
+  status TEXT CHECK (status IN ('pending', 'in_progress', 'completed')) DEFAULT 'pending',
+  created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
+);
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_meetings_user_id ON public.meetings(user_id);
 CREATE INDEX IF NOT EXISTS idx_meetings_date ON public.meetings(date DESC);
 CREATE INDEX IF NOT EXISTS idx_action_items_meeting_id ON public.action_items(meeting_id);
 CREATE INDEX IF NOT EXISTS idx_action_items_user_id ON public.action_items(user_id);
+CREATE INDEX IF NOT EXISTS idx_insight_tasks_user_id ON public.insight_tasks(user_id);
 CREATE INDEX IF NOT EXISTS idx_oauth_tokens_user_provider ON public.oauth_tokens(user_id, provider);
 
 -- Trigger for Profile auto-creation on user signup
@@ -86,6 +99,7 @@ CREATE TRIGGER on_auth_user_created
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.meetings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.action_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.insight_tasks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.oauth_tokens ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies: Profiles
@@ -106,6 +120,12 @@ CREATE POLICY "Users can manage own meetings"
 -- RLS Policies: Action Items
 CREATE POLICY "Users can manage own action items"
   ON public.action_items FOR ALL
+  USING (auth.uid() = user_id OR user_id IS NULL)
+  WITH CHECK (auth.uid() = user_id OR user_id IS NULL);
+
+-- RLS Policies: Insight Tasks (Dedicated task manager for Insights)
+CREATE POLICY "Users can manage own insight tasks"
+  ON public.insight_tasks FOR ALL
   USING (auth.uid() = user_id OR user_id IS NULL)
   WITH CHECK (auth.uid() = user_id OR user_id IS NULL);
 

@@ -7,30 +7,24 @@ import {
   Plus,
   ListTodo,
   CheckSquare,
-  AlertCircle
+  AlertCircle,
+  Calendar,
+  User,
+  Search
 } from 'lucide-react';
 import {
   fetchMeetings,
-  fetchAllActionItems,
-  createActionItem,
-  deleteActionItem,
-  updateActionItemStatus,
+  fetchInsightTasks,
+  createInsightTask,
+  updateInsightTaskStatus,
+  deleteInsightTask,
   type MeetingRecord,
-  type ActionItemRecord
+  type InsightTaskRecord
 } from '../services/supabase';
-
-interface UIActionItem {
-  id: string;
-  task: string;
-  assignee?: string;
-  completed: boolean;
-  meetingTitle?: string;
-  createdAt?: string;
-}
 
 export const AnalyticsWidgets: React.FC = () => {
   const [meetings, setMeetings] = useState<MeetingRecord[]>([]);
-  const [tasks, setTasks] = useState<UIActionItem[]>([]);
+  const [tasks, setTasks] = useState<InsightTaskRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [hoveredDay, setHoveredDay] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -38,30 +32,24 @@ export const AnalyticsWidgets: React.FC = () => {
   // Form input state
   const [newTaskText, setNewTaskText] = useState('');
   const [newAssignee, setNewAssignee] = useState('');
+  const [newDueDate, setNewDueDate] = useState('');
+
+  // Table filter and search
+  const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'completed'>('all');
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     let ignore = false;
-    Promise.all([fetchMeetings(), fetchAllActionItems()])
-      .then(([meetingsData, dbActionItems]) => {
+    Promise.all([fetchMeetings(), fetchInsightTasks()])
+      .then(([meetingsData, insightTasks]) => {
         if (ignore) return;
-
         setMeetings(meetingsData || []);
-
-        // Only load real action items from action_items table
-        const formattedItems: UIActionItem[] = (dbActionItems || []).map((item: ActionItemRecord) => ({
-          id: item.id,
-          task: item.task,
-          assignee: item.assignee && item.assignee !== 'Unassigned' ? item.assignee : undefined,
-          completed: item.status === 'completed',
-          createdAt: item.created_at
-        }));
-
-        setTasks(formattedItems);
+        setTasks(insightTasks || []);
         setIsLoading(false);
       })
       .catch((err) => {
         if (!ignore) {
-          console.warn('Failed to load real analytics:', err);
+          console.warn('Failed to load insight analytics:', err);
           setIsLoading(false);
         }
       });
@@ -71,65 +59,49 @@ export const AnalyticsWidgets: React.FC = () => {
     };
   }, []);
 
-  // Toggle action item completion in real database
-  const toggleTask = async (task: UIActionItem) => {
-    const nextCompleted = !task.completed;
-    const nextStatus = nextCompleted ? 'completed' : 'pending';
+  // Toggle action item completion
+  const toggleTask = async (task: InsightTaskRecord) => {
+    const nextStatus: 'pending' | 'completed' = task.status === 'completed' ? 'pending' : 'completed';
 
     // Optimistic UI update
     setTasks((prev) =>
-      prev.map((t) => (t.id === task.id ? { ...t, completed: nextCompleted } : t))
+      prev.map((t) => (t.id === task.id ? { ...t, status: nextStatus } : t))
     );
 
-    // If item is saved in action_items table, persist to Supabase
-    if (!task.id.startsWith('meeting-')) {
-      await updateActionItemStatus(task.id, nextStatus);
-    }
+    await updateInsightTaskStatus(task.id, nextStatus);
   };
 
-  // Add real action item into Supabase
+  // Add new insight action item
   const handleAddTask = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!newTaskText.trim() || isSubmitting) return;
 
     const taskText = newTaskText.trim();
     const assigneeVal = newAssignee.trim() || undefined;
+    const dueDateVal = newDueDate.trim() || undefined;
 
     setIsSubmitting(true);
     try {
-      const saved = await createActionItem(taskText, assigneeVal);
-
-      const newItem: UIActionItem = {
-        id: saved?.id || `local-${Date.now()}`,
-        task: taskText,
-        assignee: assigneeVal,
-        completed: false,
-        createdAt: new Date().toISOString()
-      };
-
-      setTasks((prev) => [newItem, ...prev]);
+      const saved = await createInsightTask(taskText, assigneeVal, dueDateVal);
+      if (saved) {
+        setTasks((prev) => [saved, ...prev.filter((t) => t.id !== saved.id)]);
+      }
       setNewTaskText('');
       setNewAssignee('');
+      setNewDueDate('');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Delete real action item from Supabase
+  // Delete insight action item
   const handleDeleteTask = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-
-    // Optimistic delete
     setTasks((prev) => prev.filter((t) => t.id !== id));
-
-    // Delete in Supabase if persisted
-    if (!id.startsWith('meeting-')) {
-      await deleteActionItem(id);
-    }
+    await deleteInsightTask(id);
   };
 
-  // ── Calculate Real Analytics from PostgreSQL ─────────────────────────────
-  // Helper to reliably compute meeting duration in minutes (with fallback for notes sessions without audio)
+  // Helper to reliably compute meeting duration in minutes
   const getMeetingMinutes = (m: MeetingRecord): number => {
     if (m.duration_seconds && m.duration_seconds > 0) {
       return Math.max(1, Math.round(m.duration_seconds / 60));
@@ -152,9 +124,26 @@ export const AnalyticsWidgets: React.FC = () => {
   const totalMinutes = meetings.reduce((acc, m) => acc + getMeetingMinutes(m), 0);
   const avgMinutes = meetings.length > 0 ? Math.round(totalMinutes / meetings.length) : 0;
 
-  const completedCount = tasks.filter((t) => t.completed).length;
-  const pendingCount = tasks.length - completedCount;
+  const completedCount = tasks.filter((t) => t.status === 'completed').length;
+  const pendingCount = tasks.filter((t) => t.status !== 'completed').length;
   const completionPercent = tasks.length > 0 ? Math.round((completedCount / tasks.length) * 100) : 0;
+
+  // Filter tasks for table
+  const filteredTasks = tasks.filter((t) => {
+    const matchesFilter =
+      filterStatus === 'all'
+        ? true
+        : filterStatus === 'completed'
+        ? t.status === 'completed'
+        : t.status !== 'completed';
+
+    const matchesSearch =
+      !searchQuery.trim() ||
+      t.task.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (t.assignee && t.assignee.toLowerCase().includes(searchQuery.toLowerCase()));
+
+    return matchesFilter && matchesSearch;
+  });
 
   // Real 7-Day breakdown grouped by actual calendar dates
   const past7Days = Array.from({ length: 7 }, (_, i) => {
@@ -183,14 +172,14 @@ export const AnalyticsWidgets: React.FC = () => {
   const maxRecordedMinutes = Math.max(...weeklyActivity.map((d) => d.minutes), 5);
 
   return (
-    <div style={{ maxWidth: '980px', margin: '0 auto', padding: '24px 20px', width: '100%' }}>
+    <div style={{ maxWidth: '1040px', margin: '0 auto', padding: '24px 20px', width: '100%' }}>
       {/* Page Header */}
       <div style={{ marginBottom: '24px' }}>
         <h1 className="ios-large-title" style={{ marginBottom: '6px' }}>
           Insights &amp; Analytics
         </h1>
         <p style={{ fontSize: '13.5px', color: 'var(--text-muted)' }}>
-          Overview of your meeting activity and deliverable tracking
+          Overview of your session activity and dedicated deliverable tracking
         </p>
       </div>
 
@@ -201,10 +190,10 @@ export const AnalyticsWidgets: React.FC = () => {
         gap: '14px',
         marginBottom: '24px'
       }}>
-        {/* Metric 1: Real Sessions */}
+        {/* Metric 1: Sessions */}
         <div className="glass-panel" style={{ padding: '20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-            <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+            <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
               Vault Sessions
             </span>
             <div style={{
@@ -219,14 +208,14 @@ export const AnalyticsWidgets: React.FC = () => {
             {isLoading ? '…' : meetings.length}
           </div>
           <span style={{ fontSize: '11.5px', color: meetings.length > 0 ? 'var(--accent-emerald)' : 'var(--text-muted)', fontWeight: 600 }}>
-            {meetings.length === 1 ? '1 recorded meeting' : `${meetings.length} recorded meetings`}
+            {meetings.length === 1 ? '1 recorded session' : `${meetings.length} recorded sessions`}
           </span>
         </div>
 
-        {/* Metric 2: Real Duration */}
+        {/* Metric 2: Duration */}
         <div className="glass-panel" style={{ padding: '20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-            <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+            <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
               Recorded Time
             </span>
             <div style={{
@@ -245,11 +234,11 @@ export const AnalyticsWidgets: React.FC = () => {
           </span>
         </div>
 
-        {/* Metric 3: Real Action Items */}
+        {/* Metric 3: Insight Tasks */}
         <div className="glass-panel" style={{ padding: '20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-            <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-              Action Items
+            <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
+              Insight Tasks
             </span>
             <div style={{
               width: '32px', height: '32px', borderRadius: '10px',
@@ -267,10 +256,10 @@ export const AnalyticsWidgets: React.FC = () => {
           </span>
         </div>
 
-        {/* Metric 4: Real Completion Rate */}
+        {/* Metric 4: Completion Rate */}
         <div className="glass-panel" style={{ padding: '20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-            <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+            <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
               Completion Rate
             </span>
             <div style={{
@@ -290,382 +279,503 @@ export const AnalyticsWidgets: React.FC = () => {
         </div>
       </div>
 
-      {/* Middle Row: Real Weekly Activity Chart + Real Action Items Widget */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))',
-        gap: '20px',
-        marginBottom: '24px'
-      }}>
-        {/* Real Weekly Activity Chart from Database */}
-        <div className="glass-panel" style={{ padding: '24px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-            <div>
-              <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)' }}>
-                Weekly Meeting Volume
-              </h3>
-              <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                Minutes recorded per day across your calendar
-              </p>
-            </div>
-            <span className="badge badge-source" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 8px #10b981' }} />
-              7-Day Activity
-            </span>
+      {/* Weekly Activity Volume Chart */}
+      <div className="glass-panel" style={{ padding: '24px', marginBottom: '24px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '10px' }}>
+          <div>
+            <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)' }}>
+              Weekly Meeting Volume
+            </h3>
+            <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+              Minutes recorded per day across your calendar
+            </p>
           </div>
+          <span className="badge badge-source" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 8px #10b981' }} />
+            7-Day Activity
+          </span>
+        </div>
 
-          {/* Interactive Shimmering Bar Chart */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'flex-end',
-            justifyContent: 'space-between',
-            height: '200px',
-            paddingTop: '20px',
-            paddingBottom: '6px',
-            borderBottom: '1px solid var(--glass-border)'
-          }}>
-            {weeklyActivity.map((item, idx) => {
-              const heightPercent = item.minutes > 0
-                ? Math.max((item.minutes / maxRecordedMinutes) * 100, 16)
-                : 4;
-              const isHovered = hoveredDay === idx;
+        {/* Interactive Shimmering Bar Chart */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'flex-end',
+          justifyContent: 'space-between',
+          height: '180px',
+          paddingTop: '20px',
+          paddingBottom: '6px',
+          borderBottom: '1px solid var(--glass-border)'
+        }}>
+          {weeklyActivity.map((item, idx) => {
+            const heightPercent = item.minutes > 0
+              ? Math.max((item.minutes / maxRecordedMinutes) * 100, 16)
+              : 4;
+            const isHovered = hoveredDay === idx;
 
-              return (
-                <div
-                  key={item.day + idx}
-                  onMouseEnter={() => setHoveredDay(idx)}
-                  onMouseLeave={() => setHoveredDay(null)}
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: '8px',
-                    flex: 1,
-                    cursor: 'pointer',
-                    position: 'relative'
-                  }}
-                >
-                  {/* Tooltip on Hover with Real Counts */}
-                  {isHovered && (
-                    <div style={{
-                      position: 'absolute',
-                      top: '-46px',
-                      background: 'var(--island-bg)',
-                      border: '1px solid var(--glass-border)',
-                      padding: '5px 10px',
-                      borderRadius: '8px',
-                      fontSize: '11px',
-                      fontWeight: 600,
-                      color: 'var(--text-primary)',
-                      boxShadow: 'var(--glass-shadow-float)',
-                      whiteSpace: 'nowrap',
-                      zIndex: 30,
-                      pointerEvents: 'none'
-                    }}>
-                      {item.dateStr}: {item.minutes}m ({item.count} session{item.count !== 1 ? 's' : ''})
-                    </div>
-                  )}
-
-                  {/* Value badge pill on top of bar track */}
-                  <span style={{
-                    fontSize: '11px',
-                    fontWeight: 700,
-                    padding: '2px 6px',
-                    borderRadius: '6px',
-                    background: item.minutes > 0 ? 'rgba(99, 102, 241, 0.12)' : 'transparent',
-                    color: item.minutes > 0 ? 'var(--accent-primary)' : 'var(--text-muted)',
-                    transition: 'all 0.2s ease'
-                  }}>
-                    {item.minutes > 0 ? `${item.minutes}m` : '0m'}
-                  </span>
-
-                  {/* Equalizer track column */}
+            return (
+              <div
+                key={item.day + idx}
+                onMouseEnter={() => setHoveredDay(idx)}
+                onMouseLeave={() => setHoveredDay(null)}
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '8px',
+                  flex: 1,
+                  cursor: 'pointer',
+                  position: 'relative'
+                }}
+              >
+                {/* Tooltip on Hover */}
+                {isHovered && (
                   <div style={{
-                    width: '32px',
-                    height: '130px',
-                    borderRadius: '10px',
-                    background: 'var(--glass-surface-subtle)',
+                    position: 'absolute',
+                    top: '-46px',
+                    background: 'var(--island-bg)',
                     border: '1px solid var(--glass-border)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'flex-end',
-                    padding: '3px',
-                    position: 'relative',
-                    overflow: 'hidden',
-                    boxShadow: isHovered ? '0 0 0 1px var(--accent-primary)' : 'none',
-                    transition: 'all 0.2s ease'
+                    padding: '5px 10px',
+                    borderRadius: '8px',
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    color: 'var(--text-primary)',
+                    boxShadow: 'var(--glass-shadow-float)',
+                    whiteSpace: 'nowrap',
+                    zIndex: 30,
+                    pointerEvents: 'none'
                   }}>
-                    {/* The Shimmering Volume Bar */}
-                    <div
-                      className={item.minutes > 0 ? 'shimmer-bar-active' : ''}
-                      style={{
-                        width: '100%',
-                        height: `${heightPercent}%`,
-                        borderRadius: '6px',
-                        background: item.minutes > 0
-                          ? (isHovered
-                              ? 'linear-gradient(180deg, #06b6d4 0%, #6366f1 60%, #a855f7 100%)'
-                              : 'linear-gradient(180deg, #6366f1 0%, #a855f7 50%, #ec4899 100%)')
-                          : 'var(--glass-border)',
-                        borderTop: item.minutes > 0 ? '1px solid rgba(255, 255, 255, 0.7)' : 'none',
-                        transition: 'height 0.4s cubic-bezier(0.16, 1, 0.3, 1), background 0.2s ease'
-                      }}
-                    />
+                    {item.dateStr}: {item.minutes}m ({item.count} session{item.count !== 1 ? 's' : ''})
                   </div>
+                )}
 
-                  {/* Day label */}
-                  <span style={{
-                    fontSize: '11.5px',
-                    fontWeight: isHovered ? 700 : 500,
-                    color: isHovered ? 'var(--text-primary)' : 'var(--text-muted)',
-                    transition: 'color 0.2s ease'
-                  }}>
-                    {item.day}
-                  </span>
+                {/* Value badge pill on top of bar track */}
+                <span style={{
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  padding: '2px 6px',
+                  borderRadius: '6px',
+                  background: item.minutes > 0 ? 'rgba(99, 102, 241, 0.12)' : 'transparent',
+                  color: item.minutes > 0 ? 'var(--accent-primary)' : 'var(--text-muted)',
+                  transition: 'all 0.2s ease'
+                }}>
+                  {item.minutes > 0 ? `${item.minutes}m` : '0m'}
+                </span>
+
+                {/* Equalizer track column */}
+                <div style={{
+                  width: '32px',
+                  height: '110px',
+                  borderRadius: '10px',
+                  background: 'var(--glass-surface-subtle)',
+                  border: '1px solid var(--glass-border)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'flex-end',
+                  padding: '3px',
+                  position: 'relative',
+                  overflow: 'hidden',
+                  boxShadow: isHovered ? '0 0 0 1px var(--accent-primary)' : 'none',
+                  transition: 'all 0.2s ease'
+                }}>
+                  <div
+                    className={item.minutes > 0 ? 'shimmer-bar-active' : ''}
+                    style={{
+                      width: '100%',
+                      height: `${heightPercent}%`,
+                      borderRadius: '6px',
+                      background: item.minutes > 0
+                        ? (isHovered
+                            ? 'linear-gradient(180deg, #06b6d4 0%, #6366f1 60%, #a855f7 100%)'
+                            : 'linear-gradient(180deg, #6366f1 0%, #a855f7 50%, #ec4899 100%)')
+                        : 'var(--glass-border)',
+                      borderTop: item.minutes > 0 ? '1px solid rgba(255, 255, 255, 0.7)' : 'none',
+                      transition: 'height 0.4s cubic-bezier(0.16, 1, 0.3, 1), background 0.2s ease'
+                    }}
+                  />
                 </div>
-              );
-            })}
+
+                <span style={{
+                  fontSize: '11.5px',
+                  fontWeight: isHovered ? 700 : 500,
+                  color: isHovered ? 'var(--text-primary)' : 'var(--text-muted)',
+                  transition: 'color 0.2s ease'
+                }}>
+                  {item.day}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+
+        <div style={{ marginTop: '12px', fontSize: '11.5px', color: 'var(--text-muted)' }}>
+          <span>Total 7-day volume: {weeklyActivity.reduce((acc, d) => acc + d.minutes, 0)} min ({weeklyActivity.reduce((acc, d) => acc + d.count, 0)} session{weeklyActivity.reduce((acc, d) => acc + d.count, 0) !== 1 ? 's' : ''})</span>
+        </div>
+      </div>
+
+      {/* DEDICATED ACTION ITEMS TABLE SECTION (INSIGHT TAB) */}
+      <div className="glass-panel" style={{ padding: '26px' }}>
+        {/* Table Header & Controls */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '16px',
+          marginBottom: '20px'
+        }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <ListTodo size={20} color="var(--accent-purple)" />
+              <h2 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'var(--font-heading)' }}>
+                Action Items &amp; Deliverables Table
+              </h2>
+            </div>
+            <p style={{ fontSize: '12.5px', color: 'var(--text-muted)', marginTop: '2px' }}>
+              Dedicated task manager for your insights, projects, and deliverables
+            </p>
           </div>
 
-          <div style={{ marginTop: '12px', fontSize: '11.5px', color: 'var(--text-muted)' }}>
-            <span>Total 7-day volume: {weeklyActivity.reduce((acc, d) => acc + d.minutes, 0)} min ({weeklyActivity.reduce((acc, d) => acc + d.count, 0)} session{weeklyActivity.reduce((acc, d) => acc + d.count, 0) !== 1 ? 's' : ''})</span>
+          {/* Controls: Search, Filters & Completion */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            {/* Search Input */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              background: 'var(--input-bg)',
+              border: '1px solid var(--input-border)',
+              padding: '6px 12px',
+              borderRadius: '10px'
+            }}>
+              <Search size={14} color="var(--text-muted)" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search deliverables..."
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  outline: 'none',
+                  fontSize: '12px',
+                  color: 'var(--text-primary)',
+                  width: '140px'
+                }}
+              />
+            </div>
+
+            {/* Filter Pills */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              background: 'var(--glass-surface-subtle)',
+              padding: '3px',
+              borderRadius: '10px',
+              border: '1px solid var(--glass-border)'
+            }}>
+              <button
+                type="button"
+                onClick={() => setFilterStatus('all')}
+                style={{
+                  padding: '5px 10px',
+                  fontSize: '11.5px',
+                  fontWeight: filterStatus === 'all' ? 700 : 500,
+                  borderRadius: '7px',
+                  border: 'none',
+                  cursor: 'pointer',
+                  background: filterStatus === 'all' ? 'var(--accent-primary)' : 'transparent',
+                  color: filterStatus === 'all' ? '#ffffff' : 'var(--text-secondary)',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                All ({tasks.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setFilterStatus('pending')}
+                style={{
+                  padding: '5px 10px',
+                  fontSize: '11.5px',
+                  fontWeight: filterStatus === 'pending' ? 700 : 500,
+                  borderRadius: '7px',
+                  border: 'none',
+                  cursor: 'pointer',
+                  background: filterStatus === 'pending' ? 'var(--accent-purple)' : 'transparent',
+                  color: filterStatus === 'pending' ? '#ffffff' : 'var(--text-secondary)',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                Pending ({pendingCount})
+              </button>
+              <button
+                type="button"
+                onClick={() => setFilterStatus('completed')}
+                style={{
+                  padding: '5px 10px',
+                  fontSize: '11.5px',
+                  fontWeight: filterStatus === 'completed' ? 700 : 500,
+                  borderRadius: '7px',
+                  border: 'none',
+                  cursor: 'pointer',
+                  background: filterStatus === 'completed' ? 'var(--accent-emerald)' : 'transparent',
+                  color: filterStatus === 'completed' ? '#ffffff' : 'var(--text-secondary)',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                Done ({completedCount})
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Real Action Items Widget with Database Sync */}
-        <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px' }}>
-            <div>
-              <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)' }}>
-                Action Items &amp; Deliverables
-              </h3>
-              <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                Track, add, and manage your follow-up tasks
-              </p>
-            </div>
-
-            {/* Radial Completion Meter */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <div style={{ position: 'relative', width: '42px', height: '42px' }}>
-                <svg width="42" height="42" viewBox="0 0 42 42">
-                  <circle
-                    cx="21"
-                    cy="21"
-                    r="17"
-                    fill="none"
-                    stroke="var(--glass-border)"
-                    strokeWidth="3.5"
-                  />
-                  <circle
-                    cx="21"
-                    cy="21"
-                    r="17"
-                    fill="none"
-                    stroke="var(--accent-primary)"
-                    strokeWidth="3.5"
-                    strokeDasharray={106.8}
-                    strokeDashoffset={106.8 - (106.8 * completionPercent) / 100}
-                    strokeLinecap="round"
-                    transform="rotate(-90 21 21)"
-                    style={{ transition: 'stroke-dashoffset 0.4s ease' }}
-                  />
-                </svg>
-                <div style={{
-                  position: 'absolute',
-                  inset: 0,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '10px',
-                  fontWeight: 700,
-                  color: 'var(--text-primary)'
-                }}>
-                  {completionPercent}%
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Add New Action Item Form (Inserts into Supabase) */}
-          <form
-            onSubmit={handleAddTask}
+        {/* Add New Action Item Bar */}
+        <form
+          onSubmit={handleAddTask}
+          style={{
+            display: 'flex',
+            gap: '10px',
+            marginBottom: '16px',
+            flexWrap: 'wrap',
+            background: 'var(--glass-surface-subtle)',
+            padding: '12px 14px',
+            borderRadius: '12px',
+            border: '1px solid var(--glass-border)'
+          }}
+        >
+          <input
+            type="text"
+            value={newTaskText}
+            onChange={(e) => setNewTaskText(e.target.value)}
+            placeholder="Add new action item or deliverable..."
+            disabled={isSubmitting}
             style={{
-              display: 'flex',
-              gap: '8px',
-              marginBottom: '16px',
-              flexWrap: 'wrap'
+              flex: '2 1 240px',
+              background: 'var(--input-bg)',
+              border: '1px solid var(--input-border)',
+              borderRadius: '9px',
+              padding: '9px 13px',
+              fontSize: '13px',
+              color: 'var(--text-primary)',
+              outline: 'none',
+              transition: 'all 0.2s ease'
+            }}
+          />
+
+          <input
+            type="text"
+            value={newAssignee}
+            onChange={(e) => setNewAssignee(e.target.value)}
+            placeholder="Assignee (opt)"
+            disabled={isSubmitting}
+            style={{
+              flex: '1 1 120px',
+              background: 'var(--input-bg)',
+              border: '1px solid var(--input-border)',
+              borderRadius: '9px',
+              padding: '9px 12px',
+              fontSize: '12.5px',
+              color: 'var(--text-primary)',
+              outline: 'none',
+              transition: 'all 0.2s ease'
+            }}
+          />
+
+          <input
+            type="date"
+            value={newDueDate}
+            onChange={(e) => setNewDueDate(e.target.value)}
+            title="Target due date"
+            disabled={isSubmitting}
+            style={{
+              width: '135px',
+              background: 'var(--input-bg)',
+              border: '1px solid var(--input-border)',
+              borderRadius: '9px',
+              padding: '9px 10px',
+              fontSize: '12px',
+              color: 'var(--text-primary)',
+              outline: 'none',
+              transition: 'all 0.2s ease'
+            }}
+          />
+
+          <button
+            type="submit"
+            disabled={!newTaskText.trim() || isSubmitting}
+            className="btn-primary"
+            style={{
+              padding: '9px 18px',
+              fontSize: '12.5px',
+              borderRadius: '9px',
+              opacity: newTaskText.trim() && !isSubmitting ? 1 : 0.55,
+              cursor: newTaskText.trim() && !isSubmitting ? 'pointer' : 'not-allowed',
+              flexShrink: 0
             }}
           >
-            <input
-              type="text"
-              value={newTaskText}
-              onChange={(e) => setNewTaskText(e.target.value)}
-              placeholder="Add new action item..."
-              disabled={isSubmitting}
-              style={{
-                flex: '1 1 200px',
-                background: 'var(--input-bg)',
-                border: '1px solid var(--input-border)',
-                borderRadius: '10px',
-                padding: '8px 12px',
-                fontSize: '12.5px',
-                color: 'var(--text-primary)',
-                outline: 'none',
-                transition: 'all 0.2s ease'
-              }}
-            />
-            <input
-              type="text"
-              value={newAssignee}
-              onChange={(e) => setNewAssignee(e.target.value)}
-              placeholder="Assignee (opt)"
-              disabled={isSubmitting}
-              style={{
-                width: '105px',
-                background: 'var(--input-bg)',
-                border: '1px solid var(--input-border)',
-                borderRadius: '10px',
-                padding: '8px 10px',
-                fontSize: '12px',
-                color: 'var(--text-primary)',
-                outline: 'none',
-                transition: 'all 0.2s ease'
-              }}
-            />
-            <button
-              type="submit"
-              disabled={!newTaskText.trim() || isSubmitting}
-              className="btn-primary"
-              style={{
-                padding: '8px 14px',
-                fontSize: '12px',
-                borderRadius: '10px',
-                opacity: newTaskText.trim() && !isSubmitting ? 1 : 0.5,
-                cursor: newTaskText.trim() && !isSubmitting ? 'pointer' : 'not-allowed'
-              }}
-            >
-              <Plus size={14} />
-              {isSubmitting ? 'Saving…' : 'Add'}
-            </button>
-          </form>
+            <Plus size={15} />
+            {isSubmitting ? 'Adding…' : 'Add Deliverable'}
+          </button>
+        </form>
 
-          {/* Action Items List with Toggle and Delete */}
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '8px',
-            maxHeight: '260px',
-            overflowY: 'auto',
-            paddingRight: '4px'
-          }}>
-            {isLoading ? (
-              <div style={{ textAlign: 'center', padding: '30px 10px', color: 'var(--text-muted)', fontSize: '13px' }}>
-                Querying database…
-              </div>
-            ) : tasks.length === 0 ? (
-              <div style={{
-                textAlign: 'center',
-                padding: '30px 10px',
-                color: 'var(--text-muted)',
-                fontSize: '13px',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: '8px'
-              }}>
-                <AlertCircle size={20} color="var(--text-muted)" style={{ opacity: 0.6 }} />
-                <span>No action items found in your database. Add your first deliverable above.</span>
-              </div>
-            ) : (
-              tasks.map((task) => (
-                <div
-                  key={task.id}
-                  onClick={() => toggleTask(task)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '10px',
-                    padding: '9px 12px',
-                    borderRadius: '12px',
-                    background: task.completed ? 'rgba(16, 185, 129, 0.08)' : 'var(--glass-surface-subtle)',
-                    border: `1px solid ${task.completed ? 'rgba(16, 185, 129, 0.25)' : 'var(--glass-border)'}`,
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease'
-                  }}
-                >
-                  {/* Completion Checkmark */}
-                  <div style={{
-                    width: '18px',
-                    height: '18px',
-                    borderRadius: '6px',
-                    background: task.completed ? 'var(--accent-emerald)' : 'transparent',
-                    border: `1.5px solid ${task.completed ? 'var(--accent-emerald)' : 'var(--text-muted)'}`,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0,
-                    transition: 'all 0.18s ease'
-                  }}>
-                    {task.completed && <Check size={12} color="#ffffff" strokeWidth={3} />}
-                  </div>
+        {/* Dedicated Insight Tasks HTML Table */}
+        <div className="insight-table-container">
+          <table className="insight-table">
+            <thead>
+              <tr>
+                <th style={{ width: '130px' }}>Status</th>
+                <th>Deliverable / Task</th>
+                <th style={{ width: '160px' }}>Assignee</th>
+                <th style={{ width: '140px' }}>Due Date</th>
+                <th style={{ width: '70px', textAlign: 'center' }}>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading ? (
+                <tr>
+                  <td colSpan={5} style={{ textAlign: 'center', padding: '36px', color: 'var(--text-muted)' }}>
+                    Querying insight tasks database…
+                  </td>
+                </tr>
+              ) : filteredTasks.length === 0 ? (
+                <tr>
+                  <td colSpan={5} style={{ textAlign: 'center', padding: '36px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', color: 'var(--text-muted)' }}>
+                      <AlertCircle size={22} style={{ opacity: 0.7 }} />
+                      <span style={{ fontSize: '13px' }}>
+                        {searchQuery
+                          ? `No deliverables match "${searchQuery}".`
+                          : filterStatus !== 'all'
+                          ? `No ${filterStatus} action items found.`
+                          : 'No action items recorded yet in the Insight table. Add your first deliverable above.'}
+                      </span>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                filteredTasks.map((item) => {
+                  const isDone = item.status === 'completed';
+                  return (
+                    <tr
+                      key={item.id}
+                      onClick={() => toggleTask(item)}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      {/* Status Column */}
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <div style={{
+                            width: '18px',
+                            height: '18px',
+                            borderRadius: '6px',
+                            background: isDone ? 'var(--accent-emerald)' : 'transparent',
+                            border: `1.5px solid ${isDone ? 'var(--accent-emerald)' : 'var(--text-muted)'}`,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0,
+                            transition: 'all 0.18s ease'
+                          }}>
+                            {isDone && <Check size={12} color="#ffffff" strokeWidth={3} />}
+                          </div>
+                          <span style={{
+                            fontSize: '11px',
+                            fontWeight: 700,
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.4px',
+                            color: isDone ? 'var(--accent-emerald)' : 'var(--accent-purple)'
+                          }}>
+                            {isDone ? 'Done' : 'Pending'}
+                          </span>
+                        </div>
+                      </td>
 
-                  {/* Task Text */}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{
-                      fontSize: '12.5px',
-                      fontWeight: 500,
-                      color: task.completed ? 'var(--text-muted)' : 'var(--text-primary)',
-                      textDecoration: task.completed ? 'line-through' : 'none',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap'
-                    }}>
-                      {task.task}
-                    </p>
-                  </div>
+                      {/* Task / Deliverable Column */}
+                      <td>
+                        <span style={{
+                          fontSize: '13.5px',
+                          color: isDone ? 'var(--text-muted)' : 'var(--text-primary)',
+                          textDecoration: isDone ? 'line-through' : 'none',
+                          fontWeight: isDone ? 400 : 500,
+                          lineHeight: 1.5
+                        }}>
+                          {item.task}
+                        </span>
+                      </td>
 
-                  {/* Optional Assignee */}
-                  {task.assignee && (
-                    <span style={{
-                      fontSize: '10px',
-                      fontWeight: 600,
-                      padding: '2px 7px',
-                      borderRadius: '8px',
-                      background: 'var(--glass-border)',
-                      color: 'var(--text-secondary)',
-                      flexShrink: 0
-                    }}>
-                      {task.assignee}
-                    </span>
-                  )}
+                      {/* Assignee Column */}
+                      <td>
+                        {item.assignee && item.assignee !== 'Unassigned' ? (
+                          <span style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                            fontSize: '11.5px',
+                            fontWeight: 600,
+                            background: 'rgba(99, 102, 241, 0.12)',
+                            color: 'var(--accent-primary)',
+                            padding: '3px 8px',
+                            borderRadius: '6px'
+                          }}>
+                            <User size={12} />
+                            {item.assignee}
+                          </span>
+                        ) : (
+                          <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>—</span>
+                        )}
+                      </td>
 
-                  {/* Delete Task Button */}
-                  <button
-                    onClick={(e) => handleDeleteTask(e, task.id)}
-                    style={{
-                      width: '24px',
-                      height: '24px',
-                      borderRadius: '6px',
-                      background: 'transparent',
-                      border: 'none',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: 'var(--text-muted)',
-                      cursor: 'pointer',
-                      flexShrink: 0,
-                      transition: 'color 0.15s ease'
-                    }}
-                    onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--accent-rose)')}
-                    onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
-                    title="Delete action item from database"
-                  >
-                    <Trash2 size={13} />
-                  </button>
-                </div>
-              ))
-            )}
-          </div>
+                      {/* Due Date Column */}
+                      <td>
+                        {item.due_date ? (
+                          <span style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                            fontSize: '11.5px',
+                            color: 'var(--text-secondary)'
+                          }}>
+                            <Calendar size={12} color="var(--text-muted)" />
+                            {new Date(item.due_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                          </span>
+                        ) : (
+                          <span style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
+                            {new Date(item.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                          </span>
+                        )}
+                      </td>
+
+                      {/* Action Column */}
+                      <td style={{ textAlign: 'center' }}>
+                        <button
+                          type="button"
+                          onClick={(e) => handleDeleteTask(e, item.id)}
+                          style={{
+                            width: '26px',
+                            height: '26px',
+                            borderRadius: '6px',
+                            background: 'transparent',
+                            border: 'none',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: 'var(--text-muted)',
+                            cursor: 'pointer',
+                            transition: 'color 0.15s ease'
+                          }}
+                          onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--accent-rose)')}
+                          onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
+                          title="Delete deliverable"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>

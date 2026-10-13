@@ -294,3 +294,160 @@ export async function deleteActionItem(id: string): Promise<boolean> {
   }
   return true;
 }
+
+// ── Dedicated Insight Page Tasks (Separated from Vault Meetings) ───────────
+
+export interface InsightTaskRecord {
+  id: string;
+  user_id?: string | null;
+  task: string;
+  assignee?: string;
+  due_date?: string;
+  status: 'pending' | 'completed';
+  created_at: string;
+  updated_at?: string;
+}
+
+const LOCAL_STORAGE_INSIGHT_TASKS_KEY = 'meetwithai_insight_tasks';
+
+/** Fetch dedicated tasks for the Insight dashboard */
+export async function fetchInsightTasks(): Promise<InsightTaskRecord[]> {
+  try {
+    const { data, error } = await supabase
+      .from('insight_tasks')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (!error && data) {
+      localStorage.setItem(LOCAL_STORAGE_INSIGHT_TASKS_KEY, JSON.stringify(data));
+      return data;
+    }
+  } catch (err) {
+    console.warn('[fetchInsightTasks] Notice:', err);
+  }
+
+  // Graceful fallback to localStorage cache
+  try {
+    const cached = localStorage.getItem(LOCAL_STORAGE_INSIGHT_TASKS_KEY);
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch {}
+
+  return [];
+}
+
+/** Create a dedicated task on the Insight page */
+export async function createInsightTask(
+  task: string,
+  assignee?: string,
+  dueDate?: string
+): Promise<InsightTaskRecord | null> {
+  const { data: { user } } = await supabase.auth.getUser();
+
+  const formattedDueDate = dueDate ? safeParseDate(dueDate) : undefined;
+
+  try {
+    const { data, error } = await supabase
+      .from('insight_tasks')
+      .insert({
+        user_id: user?.id || null,
+        task,
+        assignee: assignee || 'Unassigned',
+        due_date: formattedDueDate,
+        status: 'pending'
+      })
+      .select()
+      .single();
+
+    if (!error && data) {
+      const existing = JSON.parse(localStorage.getItem(LOCAL_STORAGE_INSIGHT_TASKS_KEY) || '[]');
+      const updated = [data, ...(Array.isArray(existing) ? existing.filter((x: InsightTaskRecord) => x.id !== data.id) : [])];
+      localStorage.setItem(LOCAL_STORAGE_INSIGHT_TASKS_KEY, JSON.stringify(updated));
+      return data;
+    }
+  } catch (err) {
+    console.warn('[createInsightTask] Notice:', err);
+  }
+
+  // Fallback to local storage if table is awaiting migration
+  const fallbackItem: InsightTaskRecord = {
+    id: `local-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    user_id: user?.id || null,
+    task,
+    assignee: assignee || 'Unassigned',
+    due_date: formattedDueDate || undefined,
+    status: 'pending',
+    created_at: new Date().toISOString()
+  };
+
+  try {
+    const existing = JSON.parse(localStorage.getItem(LOCAL_STORAGE_INSIGHT_TASKS_KEY) || '[]');
+    const updated = [fallbackItem, ...(Array.isArray(existing) ? existing : [])];
+    localStorage.setItem(LOCAL_STORAGE_INSIGHT_TASKS_KEY, JSON.stringify(updated));
+  } catch {}
+
+  return fallbackItem;
+}
+
+/** Toggle or update status of an Insight task */
+export async function updateInsightTaskStatus(
+  id: string,
+  status: 'pending' | 'completed'
+): Promise<boolean> {
+  // Update Supabase if table exists
+  if (!id.startsWith('local-')) {
+    try {
+      const { error } = await supabase
+        .from('insight_tasks')
+        .update({ status, updated_at: new Date().toISOString() })
+        .eq('id', id);
+
+      if (!error) {
+        // Updated in DB successfully
+      }
+    } catch (err) {
+      console.warn('[updateInsightTaskStatus] Notice:', err);
+    }
+  }
+
+  // Always sync local storage for snappy optimistic feel
+  try {
+    const existing = JSON.parse(localStorage.getItem(LOCAL_STORAGE_INSIGHT_TASKS_KEY) || '[]');
+    if (Array.isArray(existing)) {
+      const updated = existing.map((t: InsightTaskRecord) => t.id === id ? { ...t, status } : t);
+      localStorage.setItem(LOCAL_STORAGE_INSIGHT_TASKS_KEY, JSON.stringify(updated));
+    }
+  } catch {}
+
+  return true;
+}
+
+/** Delete an Insight task */
+export async function deleteInsightTask(id: string): Promise<boolean> {
+  if (!id.startsWith('local-')) {
+    try {
+      const { error } = await supabase
+        .from('insight_tasks')
+        .delete()
+        .eq('id', id);
+
+      if (!error) {
+        // Deleted in DB
+      }
+    } catch (err) {
+      console.warn('[deleteInsightTask] Notice:', err);
+    }
+  }
+
+  try {
+    const existing = JSON.parse(localStorage.getItem(LOCAL_STORAGE_INSIGHT_TASKS_KEY) || '[]');
+    if (Array.isArray(existing)) {
+      const updated = existing.filter((t: InsightTaskRecord) => t.id !== id);
+      localStorage.setItem(LOCAL_STORAGE_INSIGHT_TASKS_KEY, JSON.stringify(updated));
+    }
+  } catch {}
+
+  return true;
+}
