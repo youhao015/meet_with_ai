@@ -593,8 +593,8 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
             </h3>
             {isRecording && (
               <span className="badge" style={{
-                background: isTranscribingChunk ? 'rgba(168, 85, 247, 0.15)' : 'rgba(34, 197, 94, 0.15)',
-                color: isTranscribingChunk ? '#a855f7' : '#22c55e',
+                background: 'rgba(34, 197, 94, 0.15)',
+                color: '#22c55e',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '6px'
@@ -603,11 +603,11 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
                   width: '6px',
                   height: '6px',
                   borderRadius: '50%',
-                  background: isTranscribingChunk ? '#a855f7' : (audioLevel > 5 ? '#22c55e' : 'var(--accent-primary)'),
+                  background: audioLevel > 5 ? '#22c55e' : '#10b981',
                   animation: 'pulse 1s infinite',
                   display: 'inline-block'
                 }} />
-                {isTranscribingChunk ? 'Whisper Syncing…' : '10s Interval Sync Active'}
+                Audio Stream Active
               </span>
             )}
             {!isRecording && isListening && hasAudioInput && (
@@ -632,7 +632,7 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
           </span>
         </div>
 
-        {/* 10-Second Live Whisper Sync Stream Bar */}
+        {/* Live Audio Stream Bar */}
         {isRecording && (
           <div style={{
             display: 'flex',
@@ -653,13 +653,8 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
               animation: 'pulse 1s infinite',
               flexShrink: 0
             }} />
-            <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--accent-primary)', flexShrink: 0, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-              {isTranscribingChunk ? 'Whisper Syncing:' : 'Audio Stream Active:'}
-            </span>
-            <span style={{ fontSize: '13.5px', color: 'var(--text-secondary)' }}>
-              {isTranscribingChunk
-                ? 'Transcribing audio with Groq Whisper…'
-                : 'Recording live audio · Synced in 10-second intervals'}
+            <span style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--accent-primary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              {isTranscribingChunk ? 'Audio Stream Active (Syncing…)' : 'Audio Stream Active'}
             </span>
           </div>
         )}
