@@ -556,7 +556,7 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
           <ol style={{ margin: '10px 0 0 20px', color: 'var(--text-secondary)', fontSize: '12.5px', lineHeight: 1.7 }}>
             <li>Use <strong>Record Meeting Audio</strong> for calls in your browser.</li>
             <li>In the share dialog, choose the meeting tab and turn on its audio.</li>
-            <li>Stop the recording, transcribe it if needed, then generate your summary.</li>
+            <li>Stop recording then generate your summary.</li>
           </ol>
         )}
 
