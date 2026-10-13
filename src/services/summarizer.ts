@@ -151,7 +151,7 @@ async function callGeminiSummarize(
   transcript: string,
   title: string
 ): Promise<SummaryData> {
-  const models = ['gemini-2.0-flash', 'gemini-1.5-flash'];
+  const models = ['gemini-2.5-flash', 'gemini-flash-latest', 'gemini-2.0-flash'];
   const prompt = buildExecutivePrompt(transcript, title);
   let lastError = '';
 
