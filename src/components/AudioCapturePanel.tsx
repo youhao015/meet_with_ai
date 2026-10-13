@@ -40,6 +40,7 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
   // 3-2-1 Countdown buffer state for transcript API initialization
   const [countdown, setCountdown] = useState<number | null>(null);
   const countdownAbortRef = React.useRef(false);
+  const skipCountdownRef = React.useRef(false);
 
   // Automatic transcription state
   const [isTranscribing, setIsTranscribing] = useState(false);
@@ -134,18 +135,20 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
     try {
       setErrorMessage(null);
       countdownAbortRef.current = false;
+      skipCountdownRef.current = false;
 
       // 1. Establish hardware capture (for system mode, prompts user to select tab/screen first)
       await startRecording(mode);
 
       // 2. Count down 3 -> 2 -> 1 to give the user buffer time to prepare
       for (let count = 3; count >= 1; count--) {
-        if (countdownAbortRef.current) break;
+        if (countdownAbortRef.current || skipCountdownRef.current) break;
         setCountdown(count);
         await new Promise((r) => setTimeout(r, 1000));
       }
 
       setCountdown(null);
+      skipCountdownRef.current = false;
 
       // 3. Connect and start speech recognition right as countdown finishes so speech is immediately heard
       if (isSpeechSupported && !countdownAbortRef.current) {
@@ -166,6 +169,7 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
 
   const handleStopCapture = () => {
     countdownAbortRef.current = true;
+    skipCountdownRef.current = true;
     setCountdown(null);
     stopRecording();
     if (isListening) {
@@ -299,7 +303,9 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
               {countdown !== null ? (
                 <div style={{
                   width: '10px', height: '10px', borderRadius: '50%',
-                  background: '#f59e0b', animation: 'pulse 0.8s infinite'
+                  background: 'linear-gradient(135deg, #a855f7 0%, #ec4899 100%)',
+                  boxShadow: '0 0 12px rgba(236, 72, 153, 0.9)',
+                  animation: 'pulse 0.6s infinite'
                 }} />
               ) : isRecording ? (
                 <div style={{
@@ -313,9 +319,9 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
                 fontFamily: 'monospace',
                 fontSize: '18px',
                 fontWeight: 700,
-                color: countdown !== null ? '#f59e0b' : isRecording ? 'var(--accent-rose)' : 'var(--text-secondary)'
+                color: countdown !== null ? '#ec4899' : isRecording ? 'var(--accent-rose)' : 'var(--text-secondary)'
               }}>
-                {countdown !== null ? `Starting in ${countdown}…` : formatDuration(recordingDuration)}
+                {countdown !== null ? `BUFFER 0:0${countdown}` : formatDuration(recordingDuration)}
               </span>
             </div>
 
@@ -343,16 +349,26 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
                 disabled
                 className="btn-primary"
                 style={{
-                  background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                  background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%)',
                   cursor: 'wait',
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '8px',
-                  boxShadow: '0 0 16px rgba(245, 158, 11, 0.4)'
+                  gap: '10px',
+                  boxShadow: '0 0 22px rgba(168, 85, 247, 0.55)',
+                  border: '1px solid rgba(255, 255, 255, 0.3)',
+                  fontWeight: 700
                 }}
               >
-                <RefreshCw size={16} style={{ animation: 'spin 1s linear infinite' }} />
-                Buffering API… ({countdown})
+                <RefreshCw size={15} style={{ animation: 'spin 0.9s linear infinite' }} />
+                <span>Buffering Audio…</span>
+                <span style={{
+                  background: 'rgba(255, 255, 255, 0.25)',
+                  padding: '2px 8px',
+                  borderRadius: '6px',
+                  fontSize: '12px'
+                }}>
+                  {countdown}s
+                </span>
               </button>
             ) : !isRecording ? (
               <>
@@ -428,57 +444,78 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
           </button>
         </div>
 
-        {/* 3-2-1 Countdown Buffer Banner */}
+        {/* Ultra-Premium 3-2-1 Countdown Buffer HUD Card */}
         {countdown !== null && (
-          <div style={{
-            marginTop: '16px',
-            padding: '14px 20px',
-            borderRadius: '14px',
-            background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.12) 0%, rgba(245, 158, 11, 0.12) 100%)',
-            border: '1px solid rgba(245, 158, 11, 0.35)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '16px',
-            animation: 'pulse 1.2s infinite ease-in-out'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-              <div style={{
-                width: '38px',
-                height: '38px',
-                borderRadius: '50%',
-                background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '20px',
-                fontWeight: 800,
-                color: '#ffffff',
-                boxShadow: '0 0 16px rgba(245, 158, 11, 0.5)',
-                flexShrink: 0
-              }}>
-                {countdown}
+          <div className="premium-countdown-card">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '18px', zIndex: 1 }}>
+              <div className="countdown-orb">
+                <span key={countdown} className="countdown-orb-digit">
+                  {countdown}
+                </span>
               </div>
               <div>
-                <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)' }}>
-                  Buffering Transcript API Endpoint…
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '15px', fontWeight: 700, color: '#f8fafc', letterSpacing: '-0.2px' }}>
+                    {countdown === 3 && '⚡ Priming Audio Stream & Buffer…'}
+                    {countdown === 2 && '🎙 Calibrating Microphone & Equalizer…'}
+                    {countdown === 1 && '✨ Neural Speech Engine Ready…'}
+                  </span>
+                  <span style={{
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.6px',
+                    color: '#ec4899',
+                    background: 'rgba(236, 72, 153, 0.15)',
+                    border: '1px solid rgba(236, 72, 153, 0.3)',
+                    padding: '2px 8px',
+                    borderRadius: '6px'
+                  }}>
+                    Buffer {countdown}s
+                  </span>
                 </div>
-                <div style={{ fontSize: '12.5px', color: 'var(--text-secondary)' }}>
-                  Giving the speech recognition & transcription endpoint buffer time to connect. Speak in {countdown}…
+                <div style={{ fontSize: '13px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  <span>Speak after countdown completes</span>
+                  <span style={{ color: 'var(--glass-border)' }}>•</span>
+                  {/* Neon Mini Equalizer bars */}
+                  <span style={{ display: 'inline-flex', alignItems: 'flex-end', gap: '3px', height: '14px' }}>
+                    <span className="countdown-eq-bar" style={{ animation: 'eq-dance-1 0.7s infinite ease-in-out' }} />
+                    <span className="countdown-eq-bar" style={{ animation: 'eq-dance-2 0.8s infinite ease-in-out' }} />
+                    <span className="countdown-eq-bar" style={{ animation: 'eq-dance-3 0.6s infinite ease-in-out' }} />
+                    <span className="countdown-eq-bar" style={{ animation: 'eq-dance-4 0.9s infinite ease-in-out' }} />
+                    <span className="countdown-eq-bar" style={{ animation: 'eq-dance-5 0.75s infinite ease-in-out' }} />
+                  </span>
                 </div>
               </div>
             </div>
-            <div style={{
-              fontSize: '12px',
-              fontWeight: 700,
-              color: '#f59e0b',
-              padding: '6px 12px',
-              borderRadius: '8px',
-              background: 'rgba(245, 158, 11, 0.1)',
-              border: '1px solid rgba(245, 158, 11, 0.25)',
-              whiteSpace: 'nowrap'
-            }}>
-              3 → 2 → 1 Ready
+
+            {/* Quick Skip Button */}
+            <div style={{ zIndex: 1, display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  skipCountdownRef.current = true;
+                }}
+                className="btn-secondary"
+                style={{
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  padding: '7px 15px',
+                  borderRadius: '10px',
+                  background: 'rgba(255, 255, 255, 0.08)',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  color: 'var(--text-primary)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease'
+                }}
+                title="Skip buffer and start recording immediately"
+              >
+                <span>Start Now</span>
+                <span style={{ fontSize: '14px' }}>→</span>
+              </button>
             </div>
           </div>
         )}

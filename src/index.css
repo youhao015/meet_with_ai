@@ -725,3 +725,110 @@ button:disabled {
   pointer-events: none;
   animation: robot-sweep 3.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
+
+/* ==========================================================================
+   Ultra-Premium 3-Second Audio Pipeline Buffer Animation
+   ========================================================================== */
+
+@keyframes countdown-pop {
+  0% {
+    transform: scale(1.45);
+    opacity: 0;
+    filter: blur(6px);
+  }
+  50% {
+    transform: scale(1.08);
+    opacity: 1;
+    filter: blur(0);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes countdown-aura-rotate {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes countdown-glow-pulse {
+  0%, 100% {
+    box-shadow: 0 0 25px rgba(99, 102, 241, 0.45), inset 0 0 15px rgba(168, 85, 247, 0.35);
+    border-color: rgba(168, 85, 247, 0.6);
+  }
+  50% {
+    box-shadow: 0 0 45px rgba(168, 85, 247, 0.75), inset 0 0 25px rgba(236, 72, 153, 0.45);
+    border-color: rgba(236, 72, 153, 0.8);
+  }
+}
+
+@keyframes eq-dance-1 { 0%, 100% { height: 6px; } 50% { height: 22px; } }
+@keyframes eq-dance-2 { 0%, 100% { height: 18px; } 50% { height: 8px; } }
+@keyframes eq-dance-3 { 0%, 100% { height: 10px; } 50% { height: 28px; } }
+@keyframes eq-dance-4 { 0%, 100% { height: 24px; } 50% { height: 12px; } }
+@keyframes eq-dance-5 { 0%, 100% { height: 8px; } 50% { height: 19px; } }
+
+.premium-countdown-card {
+  position: relative;
+  overflow: hidden;
+  margin-top: 18px;
+  padding: 18px 24px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(30, 27, 75, 0.72) 0%, rgba(15, 23, 42, 0.8) 50%, rgba(88, 28, 135, 0.5) 100%);
+  border: 1px solid rgba(168, 85, 247, 0.38);
+  box-shadow: 0 16px 40px -10px rgba(99, 102, 241, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.premium-countdown-card::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle at center, rgba(168, 85, 247, 0.14) 0%, transparent 60%);
+  pointer-events: none;
+  animation: countdown-aura-rotate 12s linear infinite;
+}
+
+.countdown-orb {
+  position: relative;
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-heading);
+  font-size: 28px;
+  font-weight: 800;
+  color: #ffffff;
+  flex-shrink: 0;
+  animation: countdown-glow-pulse 2s ease-in-out infinite;
+}
+
+.countdown-orb-digit {
+  animation: countdown-pop 0.55s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  display: inline-block;
+  line-height: 1;
+}
+
+.countdown-eq-bar {
+  width: 3.5px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #ec4899 0%, #a855f7 50%, #6366f1 100%);
+  display: inline-block;
+}
