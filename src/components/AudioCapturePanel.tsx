@@ -37,11 +37,6 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
   const [activeTier, setActiveTier] = useState<'cloud' | 'local-webgpu' | 'heuristic' | null>(null);
   const [showCaptureHelp, setShowCaptureHelp] = useState(false);
 
-  // 3-2-1 Countdown buffer state for transcript API initialization
-  const [countdown, setCountdown] = useState<number | null>(null);
-  const countdownAbortRef = React.useRef(false);
-  const skipCountdownRef = React.useRef(false);
-
   // Automatic transcription state
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [transcribePercent, setTranscribePercent] = useState<number>(0);
@@ -134,28 +129,15 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
   const handleStartCapture = async (mode: 'mic' | 'system') => {
     try {
       setErrorMessage(null);
-      countdownAbortRef.current = false;
-      skipCountdownRef.current = false;
 
-      // 1. Establish hardware capture (for system mode, prompts user to select tab/screen first)
+      // 1. Establish audio capture first to ensure microphone/tab hardware is active
       await startRecording(mode);
 
-      // 2. Count down 3 -> 2 -> 1 to give the user buffer time to prepare
-      for (let count = 3; count >= 1; count--) {
-        if (countdownAbortRef.current || skipCountdownRef.current) break;
-        setCountdown(count);
-        await new Promise((r) => setTimeout(r, 1000));
-      }
-
-      setCountdown(null);
-      skipCountdownRef.current = false;
-
-      // 3. Connect and start speech recognition right as countdown finishes so speech is immediately heard
-      if (isSpeechSupported && !countdownAbortRef.current) {
+      // 2. Start speech recognition immediately once device is active
+      if (isSpeechSupported) {
         startListening();
       }
     } catch (err: unknown) {
-      setCountdown(null);
       stopListening();
       const errorObj = err instanceof Error ? err : null;
       const errorMsg = errorObj?.message || String(err || '');
@@ -168,9 +150,6 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
   };
 
   const handleStopCapture = () => {
-    countdownAbortRef.current = true;
-    skipCountdownRef.current = true;
-    setCountdown(null);
     stopRecording();
     if (isListening) {
       stopListening();
@@ -300,14 +279,7 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
             minHeight: '76px'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              {countdown !== null ? (
-                <div style={{
-                  width: '10px', height: '10px', borderRadius: '50%',
-                  background: 'linear-gradient(135deg, #a855f7 0%, #ec4899 100%)',
-                  boxShadow: '0 0 12px rgba(236, 72, 153, 0.9)',
-                  animation: 'pulse 0.6s infinite'
-                }} />
-              ) : isRecording ? (
+              {isRecording ? (
                 <div style={{
                   width: '10px', height: '10px', borderRadius: '50%',
                   background: 'var(--accent-rose)', animation: 'pulse 1s infinite'
@@ -315,19 +287,14 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
               ) : (
                 <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: 'var(--text-muted)' }} />
               )}
-              <span style={{
-                fontFamily: 'monospace',
-                fontSize: '18px',
-                fontWeight: 700,
-                color: countdown !== null ? '#ec4899' : isRecording ? 'var(--accent-rose)' : 'var(--text-secondary)'
-              }}>
-                {countdown !== null ? `BUFFER 0:0${countdown}` : formatDuration(recordingDuration)}
+              <span style={{ fontFamily: 'monospace', fontSize: '18px', fontWeight: 700, color: isRecording ? 'var(--accent-rose)' : 'var(--text-secondary)' }}>
+                {formatDuration(recordingDuration)}
               </span>
             </div>
 
             <div style={{ width: '1px', height: '24px', background: 'var(--glass-border)' }} />
 
-            <AudioVisualizer isRecording={isRecording && countdown === null} audioLevel={audioLevel} />
+            <AudioVisualizer isRecording={isRecording} audioLevel={audioLevel} />
           </div>
         </div>
 
@@ -343,34 +310,7 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
           borderTop: '1px solid var(--border-subtle)'
         }}>
           <div className="capture-actions" style={{ flexWrap: 'wrap' }}>
-            {countdown !== null ? (
-              <button
-                id="btn-countdown-buffering"
-                disabled
-                className="btn-primary"
-                style={{
-                  background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%)',
-                  cursor: 'wait',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '10px',
-                  boxShadow: '0 0 22px rgba(168, 85, 247, 0.55)',
-                  border: '1px solid rgba(255, 255, 255, 0.3)',
-                  fontWeight: 700
-                }}
-              >
-                <RefreshCw size={15} style={{ animation: 'spin 0.9s linear infinite' }} />
-                <span>Buffering Audio…</span>
-                <span style={{
-                  background: 'rgba(255, 255, 255, 0.25)',
-                  padding: '2px 8px',
-                  borderRadius: '6px',
-                  fontSize: '12px'
-                }}>
-                  {countdown}s
-                </span>
-              </button>
-            ) : !isRecording ? (
+            {!isRecording ? (
               <>
                 <button
                   id="btn-record-mic"
@@ -402,7 +342,7 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
               </button>
             )}
 
-            {(transcript || audioUrl) && !isRecording && !isTranscribing && countdown === null && (
+            {(transcript || audioUrl) && !isRecording && !isTranscribing && (
               <button
                 id="btn-reset-recording"
                 onClick={handleReset}
@@ -444,81 +384,7 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
           </button>
         </div>
 
-        {/* Ultra-Premium 3-2-1 Countdown Buffer HUD Card */}
-        {countdown !== null && (
-          <div className="premium-countdown-card">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '18px', zIndex: 1 }}>
-              <div className="countdown-orb">
-                <span key={countdown} className="countdown-orb-digit">
-                  {countdown}
-                </span>
-              </div>
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: '15px', fontWeight: 700, color: '#f8fafc', letterSpacing: '-0.2px' }}>
-                    {countdown === 3 && '⚡ Priming Audio Stream & Buffer…'}
-                    {countdown === 2 && '🎙 Calibrating Microphone & Equalizer…'}
-                    {countdown === 1 && '✨ Neural Speech Engine Ready…'}
-                  </span>
-                  <span style={{
-                    fontSize: '11px',
-                    fontWeight: 700,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.6px',
-                    color: '#ec4899',
-                    background: 'rgba(236, 72, 153, 0.15)',
-                    border: '1px solid rgba(236, 72, 153, 0.3)',
-                    padding: '2px 8px',
-                    borderRadius: '6px'
-                  }}>
-                    Buffer {countdown}s
-                  </span>
-                </div>
-                <div style={{ fontSize: '13px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                  <span>Speak after countdown completes</span>
-                  <span style={{ color: 'var(--glass-border)' }}>•</span>
-                  {/* Neon Mini Equalizer bars */}
-                  <span style={{ display: 'inline-flex', alignItems: 'flex-end', gap: '3px', height: '14px' }}>
-                    <span className="countdown-eq-bar" style={{ animation: 'eq-dance-1 0.7s infinite ease-in-out' }} />
-                    <span className="countdown-eq-bar" style={{ animation: 'eq-dance-2 0.8s infinite ease-in-out' }} />
-                    <span className="countdown-eq-bar" style={{ animation: 'eq-dance-3 0.6s infinite ease-in-out' }} />
-                    <span className="countdown-eq-bar" style={{ animation: 'eq-dance-4 0.9s infinite ease-in-out' }} />
-                    <span className="countdown-eq-bar" style={{ animation: 'eq-dance-5 0.75s infinite ease-in-out' }} />
-                  </span>
-                </div>
-              </div>
-            </div>
 
-            {/* Quick Skip Button */}
-            <div style={{ zIndex: 1, display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <button
-                type="button"
-                onClick={() => {
-                  skipCountdownRef.current = true;
-                }}
-                className="btn-secondary"
-                style={{
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  padding: '7px 15px',
-                  borderRadius: '10px',
-                  background: 'rgba(255, 255, 255, 0.08)',
-                  border: '1px solid rgba(255, 255, 255, 0.2)',
-                  color: 'var(--text-primary)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease'
-                }}
-                title="Skip buffer and start recording immediately"
-              >
-                <span>Start Now</span>
-                <span style={{ fontSize: '14px' }}>→</span>
-              </button>
-            </div>
-          </div>
-        )}
 
         {/* Automatic Whisper Transcription Progress */}
         {isTranscribing && (
