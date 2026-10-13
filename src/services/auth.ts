@@ -18,7 +18,8 @@ export async function signUpWithEmail(
     email,
     password,
     options: {
-      data: { full_name: fullName }
+      data: { full_name: fullName },
+      emailRedirectTo: typeof window !== 'undefined' ? `${window.location.origin}` : undefined
     }
   });
 
@@ -46,18 +47,6 @@ export async function signInWithEmail(
   return { user: data.user, error: null };
 }
 
-/** Sign in with Google OAuth (popup) */
-export async function signInWithGoogle(): Promise<{ error: string | null }> {
-  const { error } = await supabase.auth.signInWithOAuth({
-    provider: 'google',
-    options: {
-      redirectTo: `${window.location.origin}/auth/callback`,
-      queryParams: { access_type: 'offline', prompt: 'consent' }
-    }
-  });
-  return { error: error?.message || null };
-}
-
 /** Sign out */
 export async function signOut(): Promise<void> {
   await supabase.auth.signOut();
@@ -66,7 +55,7 @@ export async function signOut(): Promise<void> {
 /** Send password reset email */
 export async function sendPasswordReset(email: string): Promise<{ error: string | null }> {
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${window.location.origin}/auth/callback?next=/reset-password`
+    redirectTo: typeof window !== 'undefined' ? `${window.location.origin}` : undefined
   });
   return { error: error?.message || null };
 }
