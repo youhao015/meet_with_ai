@@ -8,6 +8,38 @@ export interface TranscribeResponse {
   segments?: Array<{ id: number; start: number; end: number; text: string }>;
 }
 
+export function cleanWhisperChunk(raw: string): string {
+  let text = raw.trim();
+  if (!text) return '';
+
+  // Remove bracketed or parenthesized sound tags like [Music], [Applause], (laughter), [silence]
+  text = text.replace(/\[(?:music|applause|laughter|silence|blank_audio|inaudible)\]/gi, '').trim();
+  text = text.replace(/\((?:music|applause|laughter|silence|blank_audio|inaudible)\)/gi, '').trim();
+
+  if (!text || text === '.' || text === '...' || text === '!') return '';
+
+  const lower = text.toLowerCase().replace(/[.,!?;:]/g, '').trim();
+  const hallucinations = new Set([
+    'thank you',
+    'thanks for watching',
+    'thank you for watching',
+    'please subscribe',
+    'subscribe to my channel',
+    'subtitles by the amaraorg community',
+    'subtitles by the amara.org community',
+    'subtitles by',
+    'you',
+    'bye',
+    'goodbye'
+  ]);
+
+  if (hallucinations.has(lower)) {
+    return '';
+  }
+
+  return text;
+}
+
 export function getGroqApiKey(): string {
   if (typeof window !== 'undefined') {
     const stored = localStorage.getItem('groq_api_key');

@@ -15,7 +15,11 @@ import { AudioVisualizer } from './AudioVisualizer';
 import { PipelineStatus } from './PipelineStatus';
 import { summarizeMeeting, type SummarizeResult } from '../services/summarizer';
 import { saveMeetingWithItems } from '../services/supabase';
-import { transcribeAudioWithWhisper } from '../services/transcription';
+import {
+  transcribeAudioWithWhisper,
+  cleanWhisperChunk,
+  getGroqApiKey
+} from '../services/transcription';
 
 interface AudioCapturePanelProps {
   onSummaryGenerated: (result: SummarizeResult, meetingTitle: string, transcript: string) => void;
@@ -39,6 +43,7 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
 
   // Automatic transcription state
   const [isTranscribing, setIsTranscribing] = useState(false);
+  const [isTranscribingChunk, setIsTranscribingChunk] = useState(false);
   const [transcribePercent, setTranscribePercent] = useState<number>(0);
   const wasRecordingRef = React.useRef(false);
 
@@ -55,10 +60,63 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
     setTranscript
   } = useSpeechRecognition();
 
-  // Combine committed transcript with real-time interim speech so spoken words appear instantly in the transcript area
+  // Keep transcriptRef synchronized with the latest transcript text
+  const transcriptRef = React.useRef(transcript);
+  useEffect(() => {
+    transcriptRef.current = transcript;
+  }, [transcript]);
+
+  // Combine committed transcript with real-time interim speech if fallback Web Speech is active
   const liveTranscript = isListening && interimTranscript
     ? (transcript ? `${transcript} ${interimTranscript}` : interimTranscript)
     : transcript;
+
+  // Queue to ensure 10-second audio chunks are processed strictly in chronological FIFO order
+  const chunkQueueRef = React.useRef<Blob[]>([]);
+  const isProcessingQueueRef = React.useRef(false);
+
+  const processChunkQueue = React.useCallback(async () => {
+    if (isProcessingQueueRef.current) return;
+    isProcessingQueueRef.current = true;
+
+    while (chunkQueueRef.current.length > 0) {
+      const chunkBlob = chunkQueueRef.current.shift()!;
+      try {
+        setIsTranscribingChunk(true);
+        // Provide the trailing 150 characters to Whisper as context prompt for seamless grammatical flow
+        const currentText = transcriptRef.current.trim();
+        const prompt = currentText.length > 150 ? currentText.slice(-150) : currentText;
+
+        const response = await transcribeAudioWithWhisper(chunkBlob, {
+          prompt: prompt || undefined
+        });
+
+        if (response.text) {
+          const cleaned = cleanWhisperChunk(response.text);
+          if (cleaned) {
+            const trimmed = transcriptRef.current.trim();
+            const updated = trimmed ? `${trimmed} ${cleaned}` : cleaned;
+            transcriptRef.current = updated;
+            setTranscript(updated);
+          }
+        }
+      } catch (err) {
+        console.warn('[10s Whisper Chunk Sync notice]:', err);
+      } finally {
+        setIsTranscribingChunk(false);
+      }
+    }
+
+    isProcessingQueueRef.current = false;
+  }, [setTranscript]);
+
+  const handleChunkReady = React.useCallback((sliceBlob: Blob) => {
+    // If Groq key is present, queue this 10-second chunk for Whisper transcription
+    if (getGroqApiKey()) {
+      chunkQueueRef.current.push(sliceBlob);
+      processChunkQueue();
+    }
+  }, [processChunkQueue]);
 
   const {
     isRecording,
@@ -70,7 +128,10 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
     startRecording,
     stopRecording,
     resetRecording
-  } = useAudioRecorder();
+  } = useAudioRecorder({
+    onChunkReady: handleChunkReady,
+    chunkIntervalMs: 10000 // 10-second interval: optimal balance of rate-limits (~6 req/min) & Whisper accuracy
+  });
 
   // Keep browser tab title updated so background recording is clearly visible
   useEffect(() => {
@@ -87,7 +148,7 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
     onSummarizingStateChange?.(isSummarizing);
   }, [isSummarizing, onSummarizingStateChange]);
 
-  // Automatic transcription when recording completes: transcribes audio via Groq Whisper API
+  // Fallback transcription if recording completed without live chunks (e.g. key added afterwards)
   const handleAutoTranscribe = async (blob: Blob) => {
     try {
       setIsTranscribing(true);
@@ -107,10 +168,10 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
       if (response.text && response.text.trim()) {
         const whisperText = response.text.trim();
         setTranscript(whisperText);
+        transcriptRef.current = whisperText;
       }
     } catch (err) {
       console.warn('[Auto-transcribe notice]:', err);
-      // Fallback: preserve existing live speech dictation if Whisper fails
     } finally {
       setTimeout(() => {
         setIsTranscribing(false);
@@ -121,7 +182,10 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
 
   useEffect(() => {
     if (wasRecordingRef.current && !isRecording && audioBlob && audioBlob.size > 0) {
-      handleAutoTranscribe(audioBlob);
+      // If 10-second live chunks already populated the transcript, avoid redundant full re-transcribe
+      if (!transcriptRef.current.trim()) {
+        handleAutoTranscribe(audioBlob);
+      }
     }
     wasRecordingRef.current = isRecording;
   }, [isRecording, audioBlob]);
@@ -130,11 +194,13 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
     try {
       setErrorMessage(null);
 
-      // 1. Establish audio capture first to ensure microphone/tab hardware is active
+      // 1. Establish audio capture
       await startRecording(mode);
 
-      // 2. Start speech recognition immediately once device is active
-      if (isSpeechSupported) {
+      // 2. Only start browser SpeechRecognition if Groq Whisper is NOT configured.
+      // With Groq Whisper configured, 10s chunks transcribe reliably across all devices
+      // (iOS Safari, Android, desktop, YouTube tab audio) without duplicate words.
+      if (!getGroqApiKey() && isSpeechSupported) {
         startListening();
       }
     } catch (err: unknown) {
@@ -525,13 +591,32 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
             <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)' }}>
               Real-Time Meeting Transcript
             </h3>
-            {isListening && hasAudioInput && (
+            {isRecording && (
+              <span className="badge" style={{
+                background: isTranscribingChunk ? 'rgba(168, 85, 247, 0.15)' : 'rgba(34, 197, 94, 0.15)',
+                color: isTranscribingChunk ? '#a855f7' : '#22c55e',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}>
+                <span style={{
+                  width: '6px',
+                  height: '6px',
+                  borderRadius: '50%',
+                  background: isTranscribingChunk ? '#a855f7' : (audioLevel > 5 ? '#22c55e' : 'var(--accent-primary)'),
+                  animation: 'pulse 1s infinite',
+                  display: 'inline-block'
+                }} />
+                {isTranscribingChunk ? 'Whisper Syncing…' : '10s Interval Sync Active'}
+              </span>
+            )}
+            {!isRecording && isListening && hasAudioInput && (
               <span className="badge" style={{ background: 'rgba(34, 197, 94, 0.15)', color: '#22c55e', display: 'flex', alignItems: 'center', gap: '5px' }}>
                 <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#22c55e', animation: 'pulse 1s infinite', display: 'inline-block' }} />
                 Listening
               </span>
             )}
-            {isListening && !hasAudioInput && (
+            {!isRecording && isListening && !hasAudioInput && (
               <span className="badge" style={{ background: 'rgba(99, 102, 241, 0.15)', color: 'var(--accent-primary)' }}>
                 Live Dictation Active
               </span>
@@ -547,8 +632,40 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
           </span>
         </div>
 
-        {/* Real-time Voice Stream Bar */}
-        {isListening && (
+        {/* 10-Second Live Whisper Sync Stream Bar */}
+        {isRecording && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            padding: '10px 16px',
+            marginBottom: '12px',
+            background: 'rgba(99, 102, 241, 0.08)',
+            border: '1px solid rgba(99, 102, 241, 0.22)',
+            borderRadius: '12px'
+          }}>
+            <span style={{
+              width: '8px',
+              height: '8px',
+              borderRadius: '50%',
+              background: isTranscribingChunk ? '#a855f7' : (audioLevel > 5 ? '#10b981' : '#6366f1'),
+              boxShadow: audioLevel > 5 ? '0 0 8px rgba(16, 185, 129, 0.6)' : 'none',
+              animation: 'pulse 1s infinite',
+              flexShrink: 0
+            }} />
+            <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--accent-primary)', flexShrink: 0, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              {isTranscribingChunk ? 'Whisper Syncing:' : 'Audio Stream Active:'}
+            </span>
+            <span style={{ fontSize: '13.5px', color: 'var(--text-secondary)' }}>
+              {isTranscribingChunk
+                ? 'Transcribing 10s audio slice with Groq Whisper…'
+                : `Recording live audio · Transcribing every 10s (~${Math.max(1, 10 - (recordingDuration % 10))}s to next sync)`}
+            </span>
+          </div>
+        )}
+
+        {/* Fallback Real-time Voice Stream Bar if Web Speech is active without recording */}
+        {!isRecording && isListening && (
           <div style={{
             display: 'flex',
             alignItems: 'center',

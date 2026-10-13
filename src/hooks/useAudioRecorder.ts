@@ -1,5 +1,19 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 
+export interface UseAudioRecorderOptions {
+  /**
+   * Callback fired every ~chunkIntervalMs with a standalone, header-intact audio slice.
+   * Transcribing these 10s chunks directly with Whisper enables reliable real-time
+   * dictation across all devices (including iOS Safari and meeting/YouTube audio).
+   */
+  onChunkReady?: (blob: Blob) => void | Promise<void>;
+  /**
+   * Interval duration in milliseconds for audio chunks. Defaults to 10,000ms (~10 seconds).
+   * 10 seconds is the sweet spot: gentle on API rate limits (~6 requests/min) and high Whisper accuracy.
+   */
+  chunkIntervalMs?: number;
+}
+
 export interface UseAudioRecorderReturn {
   isRecording: boolean;
   recordingDuration: number;
@@ -12,7 +26,7 @@ export interface UseAudioRecorderReturn {
   resetRecording: () => void;
 }
 
-export function useAudioRecorder(): UseAudioRecorderReturn {
+export function useAudioRecorder(options?: UseAudioRecorderOptions): UseAudioRecorderReturn {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
@@ -31,6 +45,14 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
   const displayStreamRef = useRef<MediaStream | null>(null);
   const micStreamRef = useRef<MediaStream | null>(null);
   const mixAudioContextRef = useRef<AudioContext | null>(null);
+
+  // Sliced interval recording refs
+  const isRecordingRef = useRef(false);
+  const sliceRecorderRef = useRef<MediaRecorder | null>(null);
+  const sliceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onChunkReadyRef = useRef(options?.onChunkReady);
+  onChunkReadyRef.current = options?.onChunkReady;
+  const chunkIntervalMs = options?.chunkIntervalMs ?? 10000;
 
   const cleanupAudioAnalysis = useCallback(() => {
     if (animationFrameRef.current) {
@@ -74,7 +96,82 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
     }
   }, []);
 
+  // Rotates 10-second standalone MediaRecorder slices on the live MediaStream.
+  // Stopping each slice writes the full container header (WebM/MP4), producing a 100%
+  // valid standalone file that Whisper accepts without corruption.
+  const rotateSlice = useCallback((stream: MediaStream, mimeType: string) => {
+    if (!isRecordingRef.current) return;
+
+    const sliceChunks: Blob[] = [];
+    let nextRecorder: MediaRecorder;
+    try {
+      nextRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
+    } catch (e) {
+      console.warn('[useAudioRecorder] Failed to create slice recorder:', e);
+      return;
+    }
+
+    const prevRecorder = sliceRecorderRef.current;
+    sliceRecorderRef.current = nextRecorder;
+
+    nextRecorder.ondataavailable = (e) => {
+      if (e.data && e.data.size > 0) {
+        sliceChunks.push(e.data);
+      }
+    };
+
+    nextRecorder.onstop = () => {
+      if (sliceChunks.length > 0) {
+        const sliceBlob = new Blob(sliceChunks, {
+          type: mimeType || nextRecorder.mimeType || 'audio/webm'
+        });
+        // Whisper requires ~2KB minimum to contain audible speech
+        if (sliceBlob.size >= 2048 && onChunkReadyRef.current) {
+          onChunkReadyRef.current(sliceBlob);
+        }
+      }
+    };
+
+    // Safely stop previous recorder to emit its chunk
+    if (prevRecorder && prevRecorder.state === 'recording') {
+      try {
+        prevRecorder.stop();
+      } catch (err) {
+        console.warn('Error stopping previous slice recorder:', err);
+      }
+    }
+
+    try {
+      nextRecorder.start();
+    } catch (err) {
+      console.warn('Failed to start next slice recorder:', err);
+      return;
+    }
+
+    // Schedule next slice rotation in chunkIntervalMs (~10 seconds)
+    sliceTimerRef.current = setTimeout(() => {
+      if (isRecordingRef.current) {
+        rotateSlice(stream, mimeType);
+      }
+    }, chunkIntervalMs);
+  }, [chunkIntervalMs]);
+
   const stopRecording = useCallback(() => {
+    isRecordingRef.current = false;
+
+    if (sliceTimerRef.current) {
+      clearTimeout(sliceTimerRef.current);
+      sliceTimerRef.current = null;
+    }
+
+    // Stop active slice recorder so its trailing chunk (e.g. 3-7s) is emitted
+    if (sliceRecorderRef.current && sliceRecorderRef.current.state === 'recording') {
+      try {
+        sliceRecorderRef.current.stop();
+      } catch {}
+    }
+    sliceRecorderRef.current = null;
+
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
@@ -132,8 +229,8 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
 
         const audioTracks = displayStream.getAudioTracks();
         if (audioTracks.length > 0) {
-          // Attempt to mix microphone with tab audio so both meeting attendees (in earphones)
-          // and user's microphone speech are cleanly recorded into one session
+          // Attempt to mix microphone with tab audio so both meeting attendees
+          // and user's microphone speech are cleanly recorded
           try {
             const micStream = await navigator.mediaDevices.getUserMedia({
               audio: {
@@ -163,8 +260,7 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
             audioStreamToRecord = new MediaStream(audioTracks);
           }
         } else {
-          // If the user selected a screen or window without checking audio,
-          // gracefully fallback to microphone audio so recording succeeds
+          // Graceful fallback to microphone if user didn't check audio share
           try {
             const micFallback = await navigator.mediaDevices.getUserMedia({
               audio: {
@@ -178,21 +274,19 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
             displayStream.getTracks().forEach((t) => t.stop());
             displayStreamRef.current = null;
             throw new Error(
-              'No audio stream found. Please check "Share audio" in the sharing dialog, or click "Record In-Room Mic".',
+              'No audio stream found. Please check "Share audio" in the sharing dialog, or click "In-Room Mic".',
               { cause: err }
             );
           }
         }
 
-        // Note: Do not automatically kill the entire recording session if screen sharing ends.
-        // The user must explicitly click "Stop Recording" to end their session.
         displayStream.getVideoTracks().forEach((track) => {
           track.onended = () => {
             console.log('[AudioRecorder] Video share stream track ended; audio capture continues until user stops.');
           };
         });
       } else {
-        // Microphone audio
+        // Microphone audio (iOS Safari, Android Chrome, Desktop)
         const micStream = await navigator.mediaDevices.getUserMedia({
           audio: {
             echoCancellation: true,
@@ -209,9 +303,9 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
       const mimeCandidates = [
         'audio/webm;codecs=opus',
         'audio/webm',
-        'audio/ogg;codecs=opus',
         'audio/mp4',
-        'audio/aac'
+        'audio/aac',
+        'audio/ogg;codecs=opus'
       ];
       const mimeType = mimeCandidates.find((type) => MediaRecorder.isTypeSupported(type)) || '';
       const recorderOptions: MediaRecorderOptions = mimeType ? { mimeType } : {};
@@ -232,7 +326,7 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
         const url = URL.createObjectURL(blob);
         setAudioUrl(url);
 
-        // Stop all tracks (screen display tracks and audio tracks)
+        // Stop all tracks
         audioStreamToRecord.getTracks().forEach((track) => track.stop());
         if (displayStreamRef.current) {
           displayStreamRef.current.getTracks().forEach((track) => track.stop());
@@ -242,13 +336,19 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
       };
 
       try {
-        mediaRecorder.start(1000); // 1-second chunks
+        mediaRecorder.start(1000);
       } catch {
         mediaRecorder.start();
       }
 
+      isRecordingRef.current = true;
       setIsRecording(true);
       setRecordingDuration(0);
+
+      // Start the 10-second slice rotation if chunk consumer is present
+      if (onChunkReadyRef.current) {
+        rotateSlice(audioStreamToRecord, mimeType);
+      }
 
       timerRef.current = setInterval(() => {
         setRecordingDuration((prev) => prev + 1);
@@ -264,12 +364,28 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
         streamRef.current = null;
       }
       cleanupAudioAnalysis();
+      isRecordingRef.current = false;
       setIsRecording(false);
       throw err;
     }
-  }, [audioUrl, startAnalysis, cleanupAudioAnalysis]);
+  }, [audioUrl, startAnalysis, cleanupAudioAnalysis, rotateSlice]);
 
   const resetRecording = useCallback(() => {
+    isRecordingRef.current = false;
+    if (sliceTimerRef.current) {
+      clearTimeout(sliceTimerRef.current);
+      sliceTimerRef.current = null;
+    }
+    if (sliceRecorderRef.current) {
+      sliceRecorderRef.current.onstop = null;
+      if (sliceRecorderRef.current.state === 'recording') {
+        try {
+          sliceRecorderRef.current.stop();
+        } catch {}
+      }
+      sliceRecorderRef.current = null;
+    }
+
     stopRecording();
     cleanupAudioAnalysis();
     if (audioUrl) {
@@ -282,6 +398,8 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
 
   useEffect(() => {
     return () => {
+      isRecordingRef.current = false;
+      if (sliceTimerRef.current) clearTimeout(sliceTimerRef.current);
       if (timerRef.current) clearInterval(timerRef.current);
       cleanupAudioAnalysis();
     };
