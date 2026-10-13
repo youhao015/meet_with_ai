@@ -151,16 +151,20 @@ async function callGeminiSummarize(
   transcript: string,
   title: string
 ): Promise<SummaryData> {
-  const models = ['gemini-3.8-flash', 'gemini-2.5-flash'];
+  const models = ['gemini-2.0-flash', 'gemini-1.5-flash'];
   const prompt = buildExecutivePrompt(transcript, title);
   let lastError = '';
 
   for (const model of models) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 6000);
+
     try {
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
       const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
         body: JSON.stringify({
           contents: [
             {
@@ -174,6 +178,7 @@ async function callGeminiSummarize(
           }
         })
       });
+      clearTimeout(timeoutId);
 
       if (!res.ok) {
         const errText = await res.text().catch(() => '');
@@ -191,6 +196,7 @@ async function callGeminiSummarize(
       const parsed = JSON.parse(clean) as Partial<SummaryData>;
       return validateSummaryData(parsed);
     } catch (err) {
+      clearTimeout(timeoutId);
       lastError = err instanceof Error ? err.message : String(err);
     }
   }
@@ -210,6 +216,9 @@ async function callGroqSummarize(
   let lastError = '';
 
   for (const model of models) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 12000);
+
     try {
       const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
@@ -217,6 +226,7 @@ async function callGroqSummarize(
           'Content-Type': 'application/json',
           Authorization: `Bearer ${apiKey}`
         },
+        signal: controller.signal,
         body: JSON.stringify({
           model,
           messages: [
@@ -233,6 +243,7 @@ async function callGroqSummarize(
           temperature: 0.1
         })
       });
+      clearTimeout(timeoutId);
 
       if (!res.ok) {
         const errText = await res.text().catch(() => '');
@@ -255,6 +266,7 @@ async function callGroqSummarize(
       const parsed = JSON.parse(clean) as Partial<SummaryData>;
       return validateSummaryData(parsed);
     } catch (err) {
+      clearTimeout(timeoutId);
       lastError = err instanceof Error ? err.message : String(err);
     }
   }
@@ -372,31 +384,13 @@ export async function summarizeMeeting(options: SummarizeOptions): Promise<Summa
     audioUrlPromise = uploadAudio(audioBlob, title);
   }
 
-  const geminiApiKey = getGeminiApiKey();
   const groqApiKey = getGroqApiKey();
+  const geminiApiKey = getGeminiApiKey();
 
-  // ── Tier 1A: Google Gemini 3.8 Flash AI ──────────────────────────────────────
-  if (geminiApiKey) {
-    try {
-      progress('Analyzing transcript with Google Gemini AI…', 30);
-      const summary = await callGeminiSummarize(geminiApiKey, transcript, title);
-      progress('Executive summary generated ✓ (Gemini 3.8 Flash)', 100);
-      const audioUrl = await audioUrlPromise;
-      return {
-        summary,
-        tierUsed: 'cloud',
-        audioUrl,
-        provider: 'gemini/gemini-3.8-flash'
-      };
-    } catch (geminiErr) {
-      console.warn('[Gemini AI failed, attempting Groq fallback]:', geminiErr);
-    }
-  }
-
-  // ── Tier 1B: Groq AI (GPT-OSS-120B / Qwen 27B) ──────────────────────────────
+  // ── Tier 1A: Groq AI (GPT-OSS-120B / Qwen 27B - Ultra Fast <1s) ─────────────
   if (groqApiKey) {
     try {
-      progress('Analyzing transcript with Groq AI…', 40);
+      progress('Analyzing transcript with Groq AI…', 35);
       const summary = await callGroqSummarize(groqApiKey, transcript, title);
       progress('Executive summary generated ✓ (Groq AI)', 100);
       const audioUrl = await audioUrlPromise;
@@ -407,7 +401,25 @@ export async function summarizeMeeting(options: SummarizeOptions): Promise<Summa
         provider: 'groq/gpt-oss-120b'
       };
     } catch (groqErr) {
-      console.warn('[Groq AI failed]:', groqErr);
+      console.warn('[Groq AI failed, attempting Gemini fallback]:', groqErr);
+    }
+  }
+
+  // ── Tier 1B: Google Gemini Flash AI ──────────────────────────────────────────
+  if (geminiApiKey) {
+    try {
+      progress('Analyzing transcript with Google Gemini AI…', 50);
+      const summary = await callGeminiSummarize(geminiApiKey, transcript, title);
+      progress('Executive summary generated ✓ (Gemini Flash)', 100);
+      const audioUrl = await audioUrlPromise;
+      return {
+        summary,
+        tierUsed: 'cloud',
+        audioUrl,
+        provider: 'gemini/gemini-flash'
+      };
+    } catch (geminiErr) {
+      console.warn('[Gemini AI failed, attempting backend fallback]:', geminiErr);
     }
   }
 
