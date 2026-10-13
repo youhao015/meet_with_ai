@@ -130,15 +130,34 @@ export const AnalyticsWidgets: React.FC = () => {
   };
 
   // ── Calculate Real Analytics from PostgreSQL ─────────────────────────────
-  const totalDurationSec = meetings.reduce((acc, m) => acc + (m.duration_seconds || 0), 0);
-  const totalMinutes = Math.round(totalDurationSec / 60);
+  // Helper to reliably compute meeting duration in minutes (with fallback for notes sessions without audio)
+  const getMeetingMinutes = (m: MeetingRecord): number => {
+    if (m.duration_seconds && m.duration_seconds > 0) {
+      return Math.max(1, Math.round(m.duration_seconds / 60));
+    }
+    const wordCount = (m.transcript || '').trim().split(/\s+/).filter(Boolean).length;
+    if (wordCount > 0) {
+      return Math.max(1, Math.round(wordCount / 130));
+    }
+    return 1;
+  };
+
+  const isSameCalendarDay = (d1: Date, d2: Date) => {
+    return (
+      d1.getFullYear() === d2.getFullYear() &&
+      d1.getMonth() === d2.getMonth() &&
+      d1.getDate() === d2.getDate()
+    );
+  };
+
+  const totalMinutes = meetings.reduce((acc, m) => acc + getMeetingMinutes(m), 0);
   const avgMinutes = meetings.length > 0 ? Math.round(totalMinutes / meetings.length) : 0;
 
   const completedCount = tasks.filter((t) => t.completed).length;
   const pendingCount = tasks.length - completedCount;
   const completionPercent = tasks.length > 0 ? Math.round((completedCount / tasks.length) * 100) : 0;
 
-  // Real 7-Day breakdown grouped by actual created_at dates
+  // Real 7-Day breakdown grouped by actual calendar dates
   const past7Days = Array.from({ length: 7 }, (_, i) => {
     const d = new Date();
     d.setDate(d.getDate() - (6 - i));
@@ -149,13 +168,10 @@ export const AnalyticsWidgets: React.FC = () => {
   const weeklyActivity = past7Days.map((d) => {
     const dayMeetings = meetings.filter((m) => {
       const meetDate = new Date(m.date || m.created_at);
-      meetDate.setHours(0, 0, 0, 0);
-      return meetDate.getTime() === d.getTime();
+      return isSameCalendarDay(meetDate, d);
     });
 
-    const dayMinutes = Math.round(
-      dayMeetings.reduce((acc, m) => acc + (m.duration_seconds || 0), 0) / 60
-    );
+    const dayMinutes = dayMeetings.reduce((acc, m) => acc + getMeetingMinutes(m), 0);
 
     return {
       day: d.toLocaleDateString('en-US', { weekday: 'short' }),
@@ -165,7 +181,7 @@ export const AnalyticsWidgets: React.FC = () => {
     };
   });
 
-  const maxRecordedMinutes = Math.max(...weeklyActivity.map((d) => d.minutes), 30);
+  const maxRecordedMinutes = Math.max(...weeklyActivity.map((d) => d.minutes), 5);
 
   return (
     <div style={{ maxWidth: '980px', margin: '0 auto', padding: '24px 20px', width: '100%' }}>
@@ -303,14 +319,14 @@ export const AnalyticsWidgets: React.FC = () => {
             display: 'flex',
             alignItems: 'flex-end',
             justifyContent: 'space-between',
-            height: '180px',
-            paddingTop: '20px',
+            height: '190px',
+            paddingTop: '26px',
             borderBottom: '1px solid var(--glass-border)'
           }}>
             {weeklyActivity.map((item, idx) => {
               const heightPercent = item.minutes > 0
-                ? Math.max((item.minutes / maxRecordedMinutes) * 100, 10)
-                : 4;
+                ? Math.max((item.minutes / maxRecordedMinutes) * 100, 14)
+                : 6;
               const isHovered = hoveredDay === idx;
 
               return (
@@ -322,7 +338,7 @@ export const AnalyticsWidgets: React.FC = () => {
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
-                    gap: '8px',
+                    gap: '6px',
                     flex: 1,
                     cursor: 'pointer',
                     position: 'relative'
@@ -332,7 +348,7 @@ export const AnalyticsWidgets: React.FC = () => {
                   {isHovered && (
                     <div style={{
                       position: 'absolute',
-                      top: '-38px',
+                      top: '-42px',
                       background: 'var(--island-bg)',
                       border: '1px solid var(--glass-border)',
                       padding: '4px 8px',
@@ -348,6 +364,15 @@ export const AnalyticsWidgets: React.FC = () => {
                     </div>
                   )}
 
+                  {/* Value label on top of bar */}
+                  <span style={{
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    color: item.minutes > 0 ? 'var(--text-primary)' : 'var(--text-muted)'
+                  }}>
+                    {item.minutes > 0 ? `${item.minutes}m` : '0m'}
+                  </span>
+
                   {/* Liquid Glass Bar */}
                   <div
                     style={{
@@ -357,9 +382,9 @@ export const AnalyticsWidgets: React.FC = () => {
                       background: isHovered
                         ? 'linear-gradient(180deg, var(--accent-cyan) 0%, var(--accent-primary) 100%)'
                         : item.minutes > 0
-                          ? 'linear-gradient(180deg, rgba(99, 102, 241, 0.75) 0%, rgba(99, 102, 241, 0.3) 100%)'
-                          : 'var(--glass-border)',
-                      border: '1px solid rgba(255, 255, 255, 0.12)',
+                          ? 'linear-gradient(180deg, rgba(99, 102, 241, 0.85) 0%, rgba(139, 92, 246, 0.45) 100%)'
+                          : 'rgba(255, 255, 255, 0.05)',
+                      border: `1px solid ${item.minutes > 0 ? 'rgba(99, 102, 241, 0.35)' : 'rgba(255, 255, 255, 0.08)'}`,
                       boxShadow: isHovered && item.minutes > 0 ? '0 4px 16px var(--accent-primary-glow)' : 'none',
                       transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
                     }}
@@ -377,7 +402,7 @@ export const AnalyticsWidgets: React.FC = () => {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '12px', fontSize: '11.5px', color: 'var(--text-muted)' }}>
-            <span>Total 7-day volume: {weeklyActivity.reduce((acc, d) => acc + d.minutes, 0)} min</span>
+            <span>Total 7-day volume: {totalWeeklyMinutes} min ({totalWeeklySessions} session{totalWeeklySessions !== 1 ? 's' : ''})</span>
             <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
               <Calendar size={12} />
               Synced from PostgreSQL
