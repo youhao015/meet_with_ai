@@ -15,6 +15,7 @@ import { AudioVisualizer } from './AudioVisualizer';
 import { PipelineStatus } from './PipelineStatus';
 import { summarizeMeeting, type SummarizeResult } from '../services/summarizer';
 import { saveMeetingWithItems } from '../services/supabase';
+import { transcribeAudioWithWhisper } from '../services/transcription';
 
 interface AudioCapturePanelProps {
   onSummaryGenerated: (result: SummarizeResult, meetingTitle: string, transcript: string) => void;
@@ -35,6 +36,15 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [activeTier, setActiveTier] = useState<'cloud' | 'local-webgpu' | 'heuristic' | null>(null);
   const [showCaptureHelp, setShowCaptureHelp] = useState(false);
+
+  // 3-2-1 Countdown buffer state for transcript API initialization
+  const [countdown, setCountdown] = useState<number | null>(null);
+  const countdownAbortRef = React.useRef(false);
+
+  // Automatic transcription state
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [transcribePercent, setTranscribePercent] = useState<number>(0);
+  const wasRecordingRef = React.useRef(false);
 
   const {
     isListening,
@@ -76,17 +86,68 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
     onSummarizingStateChange?.(isSummarizing);
   }, [isSummarizing, onSummarizingStateChange]);
 
+  // Automatic transcription when recording completes: transcribes audio via Groq Whisper API
+  const handleAutoTranscribe = async (blob: Blob) => {
+    try {
+      setIsTranscribing(true);
+      setTranscribePercent(25);
+
+      const progressTimer = setInterval(() => {
+        setTranscribePercent((prev) => {
+          if (prev >= 85) return prev;
+          return prev + 15;
+        });
+      }, 400);
+
+      const response = await transcribeAudioWithWhisper(blob);
+      clearInterval(progressTimer);
+      setTranscribePercent(100);
+
+      if (response.text && response.text.trim()) {
+        const whisperText = response.text.trim();
+        setTranscript(whisperText);
+      }
+    } catch (err) {
+      console.warn('[Auto-transcribe notice]:', err);
+      // Fallback: preserve existing live speech dictation if Whisper fails
+    } finally {
+      setTimeout(() => {
+        setIsTranscribing(false);
+        setTranscribePercent(0);
+      }, 700);
+    }
+  };
+
+  useEffect(() => {
+    if (wasRecordingRef.current && !isRecording && audioBlob && audioBlob.size > 0) {
+      handleAutoTranscribe(audioBlob);
+    }
+    wasRecordingRef.current = isRecording;
+  }, [isRecording, audioBlob]);
+
   const handleStartCapture = async (mode: 'mic' | 'system') => {
     try {
       setErrorMessage(null);
-      // 1. Establish audio capture first to ensure microphone/tab hardware is active
+      countdownAbortRef.current = false;
+
+      // 1. Establish hardware capture (for system mode, prompts user to select tab/screen first)
       await startRecording(mode);
 
-      // 2. Start speech recognition once audio device is ready
+      // 2. Pre-connect speech recognition API endpoint
       if (isSpeechSupported) {
         startListening();
       }
+
+      // 3. Count down 3 -> 2 -> 1 to give the transcript API endpoint buffer time to stabilize
+      for (let count = 3; count >= 1; count--) {
+        if (countdownAbortRef.current) break;
+        setCountdown(count);
+        await new Promise((r) => setTimeout(r, 1000));
+      }
+
+      setCountdown(null);
     } catch (err: unknown) {
+      setCountdown(null);
       stopListening();
       const errorObj = err instanceof Error ? err : null;
       const errorMsg = errorObj?.message || String(err || '');
@@ -99,6 +160,8 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
   };
 
   const handleStopCapture = () => {
+    countdownAbortRef.current = true;
+    setCountdown(null);
     stopRecording();
     if (isListening) {
       stopListening();
@@ -228,7 +291,12 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
             minHeight: '76px'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              {isRecording ? (
+              {countdown !== null ? (
+                <div style={{
+                  width: '10px', height: '10px', borderRadius: '50%',
+                  background: '#f59e0b', animation: 'pulse 0.8s infinite'
+                }} />
+              ) : isRecording ? (
                 <div style={{
                   width: '10px', height: '10px', borderRadius: '50%',
                   background: 'var(--accent-rose)', animation: 'pulse 1s infinite'
@@ -236,14 +304,19 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
               ) : (
                 <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: 'var(--text-muted)' }} />
               )}
-              <span style={{ fontFamily: 'monospace', fontSize: '18px', fontWeight: 700, color: isRecording ? 'var(--accent-rose)' : 'var(--text-secondary)' }}>
-                {formatDuration(recordingDuration)}
+              <span style={{
+                fontFamily: 'monospace',
+                fontSize: '18px',
+                fontWeight: 700,
+                color: countdown !== null ? '#f59e0b' : isRecording ? 'var(--accent-rose)' : 'var(--text-secondary)'
+              }}>
+                {countdown !== null ? `Starting in ${countdown}…` : formatDuration(recordingDuration)}
               </span>
             </div>
 
             <div style={{ width: '1px', height: '24px', background: 'var(--glass-border)' }} />
 
-            <AudioVisualizer isRecording={isRecording} audioLevel={audioLevel} />
+            <AudioVisualizer isRecording={isRecording && countdown === null} audioLevel={audioLevel} />
           </div>
         </div>
 
@@ -259,7 +332,24 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
           borderTop: '1px solid var(--border-subtle)'
         }}>
           <div className="capture-actions" style={{ flexWrap: 'wrap' }}>
-            {!isRecording ? (
+            {countdown !== null ? (
+              <button
+                id="btn-countdown-buffering"
+                disabled
+                className="btn-primary"
+                style={{
+                  background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                  cursor: 'wait',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  boxShadow: '0 0 16px rgba(245, 158, 11, 0.4)'
+                }}
+              >
+                <RefreshCw size={16} style={{ animation: 'spin 1s linear infinite' }} />
+                Buffering API… ({countdown})
+              </button>
+            ) : !isRecording ? (
               <>
                 <button
                   id="btn-record-mic"
@@ -291,7 +381,7 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
               </button>
             )}
 
-            {(transcript || audioUrl) && !isRecording && (
+            {(transcript || audioUrl) && !isRecording && !isTranscribing && countdown === null && (
               <button
                 id="btn-reset-recording"
                 onClick={handleReset}
@@ -332,6 +422,102 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
             )}
           </button>
         </div>
+
+        {/* 3-2-1 Countdown Buffer Banner */}
+        {countdown !== null && (
+          <div style={{
+            marginTop: '16px',
+            padding: '14px 20px',
+            borderRadius: '14px',
+            background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.12) 0%, rgba(245, 158, 11, 0.12) 100%)',
+            border: '1px solid rgba(245, 158, 11, 0.35)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '16px',
+            animation: 'pulse 1.2s infinite ease-in-out'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+              <div style={{
+                width: '38px',
+                height: '38px',
+                borderRadius: '50%',
+                background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '20px',
+                fontWeight: 800,
+                color: '#ffffff',
+                boxShadow: '0 0 16px rgba(245, 158, 11, 0.5)',
+                flexShrink: 0
+              }}>
+                {countdown}
+              </div>
+              <div>
+                <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                  Buffering Transcript API Endpoint…
+                </div>
+                <div style={{ fontSize: '12.5px', color: 'var(--text-secondary)' }}>
+                  Giving the speech recognition & transcription endpoint buffer time to connect. Speak in {countdown}…
+                </div>
+              </div>
+            </div>
+            <div style={{
+              fontSize: '12px',
+              fontWeight: 700,
+              color: '#f59e0b',
+              padding: '6px 12px',
+              borderRadius: '8px',
+              background: 'rgba(245, 158, 11, 0.1)',
+              border: '1px solid rgba(245, 158, 11, 0.25)',
+              whiteSpace: 'nowrap'
+            }}>
+              3 → 2 → 1 Ready
+            </div>
+          </div>
+        )}
+
+        {/* Automatic Whisper Transcription Progress */}
+        {isTranscribing && (
+          <div style={{
+            marginTop: '16px',
+            padding: '12px 18px',
+            borderRadius: '12px',
+            background: 'var(--glass-surface-subtle)',
+            border: '1px solid var(--glass-border)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <RefreshCw size={14} color="var(--accent-primary)" style={{ animation: 'spin 1.2s linear infinite' }} />
+                <span style={{ fontSize: '13px', color: 'var(--text-primary)', fontWeight: 600 }}>
+                  Processing…
+                </span>
+              </div>
+              <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 600 }}>
+                {Math.round(transcribePercent)}%
+              </span>
+            </div>
+            <div style={{
+              height: '6px',
+              background: 'rgba(255, 255, 255, 0.08)',
+              borderRadius: '999px',
+              overflow: 'hidden',
+              width: '100%'
+            }}>
+              <div style={{
+                height: '100%',
+                width: `${Math.max(5, Math.min(100, transcribePercent))}%`,
+                background: 'linear-gradient(90deg, #6366f1 0%, #a855f7 100%)',
+                borderRadius: '999px',
+                transition: 'width 0.4s ease'
+              }} />
+            </div>
+          </div>
+        )}
 
         {/* Earphone Notice for Meetings */}
         {!isRecording && (
