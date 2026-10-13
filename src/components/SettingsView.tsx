@@ -8,13 +8,11 @@ import {
   Trash2,
   CheckCircle2,
   Shield,
-  Smartphone,
-  Key
+  Smartphone
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import { checkWebGPUSupport } from '../services/webllm';
 import { supabase } from '../services/supabase';
-import { getGroqApiKey, setGroqApiKey } from '../services/transcription';
 
 export const SettingsView: React.FC = () => {
   const { theme, setTheme } = useTheme();
@@ -22,8 +20,6 @@ export const SettingsView: React.FC = () => {
   const [gpuInfo, setGpuInfo] = useState<string>('Detecting GPU…');
   const [dbStatus, setDbStatus] = useState<'checking' | 'connected' | 'offline'>('checking');
   const [cacheCleared, setCacheCleared] = useState(false);
-  const [groqKey, setGroqKeyState] = useState<string>('');
-  const [keySaved, setKeySaved] = useState(false);
 
   useEffect(() => {
     // Check GPU adapter details if available
@@ -61,14 +57,7 @@ export const SettingsView: React.FC = () => {
       }
     };
     checkSupabase();
-    setGroqKeyState(getGroqApiKey());
   }, []);
-
-  const handleSaveGroqKey = () => {
-    setGroqApiKey(groqKey);
-    setKeySaved(true);
-    setTimeout(() => setKeySaved(false), 2500);
-  };
 
   const handleClearCache = async () => {
     if ('caches' in window) {
@@ -226,55 +215,6 @@ export const SettingsView: React.FC = () => {
               <span className="badge badge-server">
                 Active
               </span>
-            </div>
-
-            {/* Cloud Whisper AI Key */}
-            <div style={{
-              padding: '16px', borderRadius: '12px',
-              background: 'var(--glass-surface-subtle)', border: '1px solid var(--glass-border)',
-              display: 'flex', flexDirection: 'column', gap: '12px'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <Key size={20} color="var(--accent-primary)" />
-                  <div>
-                    <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                      Groq Whisper AI (Audio Transcription)
-                    </p>
-                    <p style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
-                      Enables instant cloud Whisper transcription on Vercel without local server
-                    </p>
-                  </div>
-                </div>
-                <span className={`badge ${groqKey ? 'badge-webgpu' : 'badge-server'}`}>
-                  {groqKey ? 'Active & Ready' : 'Key Needed for Vercel'}
-                </span>
-              </div>
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <input
-                  type="password"
-                  placeholder="gsk_..."
-                  value={groqKey}
-                  onChange={(e) => setGroqKeyState(e.target.value)}
-                  style={{
-                    flex: 1,
-                    background: 'var(--input-bg)',
-                    border: '1px solid var(--input-border)',
-                    borderRadius: '10px',
-                    padding: '9px 14px',
-                    color: 'var(--text-primary)',
-                    fontSize: '13px',
-                    outline: 'none'
-                  }}
-                />
-                <button
-                  onClick={handleSaveGroqKey}
-                  className="btn-primary"
-                  style={{ padding: '8px 16px', fontSize: '13px', whiteSpace: 'nowrap' }}
-                >
-                  {keySaved ? 'Saved!' : 'Save Key'}
-                </button>
-              </div>
             </div>
           </div>
         </div>

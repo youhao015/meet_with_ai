@@ -7,8 +7,7 @@ import {
   RefreshCw,
   Play,
   RotateCcw,
-  FileText,
-  Wand2
+  FileText
 } from 'lucide-react';
 import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
 import { useAudioRecorder } from '../hooks/useAudioRecorder';
@@ -16,7 +15,6 @@ import { AudioVisualizer } from './AudioVisualizer';
 import { PipelineStatus } from './PipelineStatus';
 import { summarizeMeeting, type SummarizeResult } from '../services/summarizer';
 import { saveMeetingWithItems } from '../services/supabase';
-import { transcribeAudioWithWhisper } from '../services/transcription';
 
 interface AudioCapturePanelProps {
   onSummaryGenerated: (result: SummarizeResult, meetingTitle: string, transcript: string) => void;
@@ -36,7 +34,6 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
   const [streamingTokens, setStreamingTokens] = useState<string>('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [activeTier, setActiveTier] = useState<'cloud' | 'local-webgpu' | 'heuristic' | null>(null);
-  const [isTranscribing, setIsTranscribing] = useState(false);
   const [showCaptureHelp, setShowCaptureHelp] = useState(false);
 
   const {
@@ -105,37 +102,6 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
     stopRecording();
     if (isListening) {
       stopListening();
-    }
-  };
-
-  const handleTranscribeAudio = async (targetBlob?: Blob | null) => {
-    const blobToTranscribe = targetBlob || audioBlob;
-    if (!blobToTranscribe) {
-      setErrorMessage('No audio recording found to transcribe.');
-      return;
-    }
-
-    try {
-      setIsTranscribing(true);
-      setErrorMessage(null);
-      setProgressText('Transcribing audio with Whisper AI…');
-      setProgressPercent(45);
-
-      const response = await transcribeAudioWithWhisper(blobToTranscribe);
-      if (response.text) {
-        setTranscript(response.text);
-        setProgressText('Transcription complete! Ready to generate summary.');
-        setProgressPercent(100);
-        setTimeout(() => setProgressPercent(0), 2000);
-      } else {
-        setErrorMessage('Whisper returned an empty transcription. Try speaking closer to the microphone.');
-      }
-    } catch (err: unknown) {
-      console.error('[Whisper Transcription Error]:', err);
-      const errMsg = err instanceof Error ? err.message : String(err || '');
-      setErrorMessage(`Whisper transcription failed: ${errMsg || 'Check server connection.'}`);
-    } finally {
-      setIsTranscribing(false);
     }
   };
 
@@ -443,59 +409,6 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
               <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Session Audio:</span>
               <audio src={audioUrl} controls style={{ height: '32px', flex: 1, minWidth: '180px', outline: 'none' }} />
             </div>
-
-            <button
-              id="btn-transcribe-whisper"
-              onClick={() => handleTranscribeAudio()}
-              disabled={isTranscribing}
-              className="btn-secondary"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px',
-                fontSize: '13px',
-                fontWeight: 600,
-                color: 'var(--accent-primary)',
-                background: 'rgba(99, 102, 241, 0.1)',
-                border: '1px solid rgba(99, 102, 241, 0.25)',
-                padding: '8px 14px',
-                borderRadius: '10px',
-                cursor: isTranscribing ? 'not-allowed' : 'pointer'
-              }}
-              title="Use Groq Whisper AI to transcribe all audio (captures in-room mic + remote meeting participants)"
-            >
-              {isTranscribing ? (
-                <>
-                  <RefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} />
-                  Transcribing with Whisper…
-                </>
-              ) : (
-                <>
-                  <Wand2 size={14} />
-                  Transcribe with Whisper AI
-                </>
-              )}
-            </button>
-          </div>
-        )}
-
-        {/* Notice if audio was recorded */}
-        {!isRecording && audioUrl && !transcript.trim() && (
-          <div style={{
-            marginTop: '14px',
-            padding: '12px 16px',
-            borderRadius: '12px',
-            background: 'rgba(99, 102, 241, 0.08)',
-            border: '1px solid rgba(99, 102, 241, 0.22)',
-            fontSize: '13px',
-            color: 'var(--text-primary)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            flexWrap: 'wrap',
-            gap: '10px'
-          }}>
-            <span>Recording finished! Click <strong>Transcribe with Whisper AI</strong> above to convert the audio into text, or type notes below.</span>
           </div>
         )}
 
