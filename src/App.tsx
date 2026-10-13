@@ -15,6 +15,7 @@ function AppShell() {
   const [currentSummaryResult, setCurrentSummaryResult] = useState<SummarizeResult | null>(null);
   const [currentTitle, setCurrentTitle] = useState<string>('');
   const [currentTranscript, setCurrentTranscript] = useState<string>('');
+  const [vaultMeeting, setVaultMeeting] = useState<MeetingRecord | null>(null);
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const [isSummarizing, setIsSummarizing] = useState<boolean>(false);
 
@@ -29,21 +30,12 @@ function AppShell() {
   };
 
   const handleSelectHistoryMeeting = (meeting: MeetingRecord) => {
-    setCurrentTitle(meeting.title);
-    setCurrentTranscript(meeting.transcript);
-    setCurrentSummaryResult({
-      summary: {
-        overview: meeting.summary?.overview || '',
-        key_points: meeting.summary?.key_points || [],
-        decisions: meeting.summary?.decisions || [],
-        action_items: meeting.summary?.action_items || []
-      },
-      tierUsed: meeting.source === 'live' ? 'local-webgpu' : 'cloud'
-    });
+    setVaultMeeting(meeting);
   };
 
   const handleNewMeeting = () => {
     setCurrentSummaryResult(null);
+    setVaultMeeting(null);
     setCurrentTitle('');
     setCurrentTranscript('');
     setActiveTab('studio');
@@ -54,7 +46,7 @@ function AppShell() {
       case 'studio':
         return currentSummaryResult ? 'Summary View' : 'Live Studio';
       case 'vault':
-        return 'Meeting Vault';
+        return vaultMeeting ? 'Meeting Details' : 'Meeting Vault';
       case 'insights':
         return 'Insights & Analytics';
       default:
@@ -92,12 +84,20 @@ function AppShell() {
         )}
 
         {activeTab === 'vault' && (
-          currentSummaryResult ? (
+          vaultMeeting ? (
             <MeetingSummaryView
-              result={currentSummaryResult}
-              title={currentTitle}
-              transcript={currentTranscript}
-              onBack={() => setCurrentSummaryResult(null)}
+              result={{
+                summary: {
+                  overview: vaultMeeting.summary?.overview || '',
+                  key_points: vaultMeeting.summary?.key_points || [],
+                  decisions: vaultMeeting.summary?.decisions || [],
+                  action_items: vaultMeeting.summary?.action_items || []
+                },
+                tierUsed: vaultMeeting.source === 'live' ? 'local-webgpu' : 'cloud'
+              }}
+              title={vaultMeeting.title}
+              transcript={vaultMeeting.transcript}
+              onBack={() => setVaultMeeting(null)}
               backLabel="Back to Vault"
             />
           ) : (
@@ -121,8 +121,13 @@ function AppShell() {
             return;
           }
           setActiveTab(tab);
-          if (tab !== 'studio') {
+          // When switching to studio, clear any old summary so the Live Studio recorder is shown
+          if (tab === 'studio') {
             setCurrentSummaryResult(null);
+          }
+          // When navigating away from vault, clear any opened vault meeting
+          if (tab !== 'vault') {
+            setVaultMeeting(null);
           }
         }}
       />
