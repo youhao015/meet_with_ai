@@ -13,7 +13,8 @@ export function getGroqApiKey(): string {
     const stored = localStorage.getItem('groq_api_key');
     if (stored?.trim()) return stored.trim();
   }
-  return (import.meta.env.VITE_GROQ_API_KEY || '').trim();
+  const env = import.meta.env as Record<string, string | undefined>;
+  return (env.VITE_GROQ_API_KEY || env.GROQ_API_KEY || '').trim();
 }
 
 export function setGroqApiKey(key: string): void {

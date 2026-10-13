@@ -4,6 +4,7 @@ import babel from '@rolldown/plugin-babel';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
+  envPrefix: ['VITE_', 'GROQ_'],
   plugins: [
     react(),
     babel({ presets: [reactCompilerPreset()] }),
