@@ -158,25 +158,31 @@ ${transcript ? `\n## Transcript\n${transcript}\n` : ''}`;
               Decisions Concluded
             </h3>
           </div>
-          <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {(result.summary.decisions || []).map((dec, idx) => (
-              <li key={idx} style={{
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: '10px',
-                fontSize: '14px',
-                color: 'var(--text-secondary)',
-                lineHeight: '1.6',
-                background: 'rgba(16, 185, 129, 0.08)',
-                padding: '10px 14px',
-                borderRadius: '10px',
-                border: '1px solid rgba(16, 185, 129, 0.2)'
-              }}>
-                <CheckCircle2 size={16} color="var(--accent-emerald)" style={{ flexShrink: 0, marginTop: '3px' }} />
-                <span>{dec}</span>
-              </li>
-            ))}
-          </ul>
+          {(!result.summary.decisions || result.summary.decisions.length === 0) ? (
+            <p style={{ fontSize: '14px', color: 'var(--text-muted)' }}>
+              No explicit decisions concluded in this session.
+            </p>
+          ) : (
+            <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {result.summary.decisions.map((dec, idx) => (
+                <li key={idx} style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '10px',
+                  fontSize: '14px',
+                  color: 'var(--text-secondary)',
+                  lineHeight: '1.6',
+                  background: 'rgba(16, 185, 129, 0.08)',
+                  padding: '10px 14px',
+                  borderRadius: '10px',
+                  border: '1px solid rgba(16, 185, 129, 0.2)'
+                }}>
+                  <CheckCircle2 size={16} color="var(--accent-emerald)" style={{ flexShrink: 0, marginTop: '3px' }} />
+                  <span>{dec}</span>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </div>
 

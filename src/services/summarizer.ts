@@ -76,41 +76,31 @@ async function uploadAudio(blob: Blob, title: string): Promise<string | undefine
   }
 }
 
-// ── Prompt Builder: Executive 4-Section Intelligence ──────────────────────────
+// ── Strict Prompt Builder ───────────────────────────────────────────────────
 
 function buildExecutivePrompt(transcript: string, title: string): string {
-  return `You are a world-class executive meeting intelligence analyst and chief of staff.
-Analyze the following meeting transcript and synthesize a highly articulate, coherent, and deeply logical executive summary.
+  return `You are a world-class executive meeting intelligence analyst.
+Analyze the following meeting transcript and produce a structured, high-value, and 100% ACCURATE executive summary.
 
-Transform raw, fragmented spoken sentences, audio artifacts, or presentation remarks into high-value professional takeaways. Filter out filler words, transcript noise, and casual chatter.
+STRICT ACCURACY & LOGIC RULES:
+1. Executive Overview: Synthesize a cohesive 2-4 sentence summary of the session's core purpose, context, and key takeaway.
+2. Key Discussion Points: Provide clear, coherent bullet points of the substantive topics discussed. Do NOT output raw transcript fragments or sentence splices.
+3. Decisions Concluded: Output ONLY decisions that were explicitly agreed upon, resolved, or approved. IF NO EXPLICIT DECISIONS WERE CONCLUDED, RETURN AN EMPTY ARRAY []. NEVER fabricate generic decisions.
+4. Assigned Action Items & Deliverables: Extract real tasks and identify the actual person or organization responsible. The assignee must be an actual entity, NOT filler words like "The" or "Meanwhile". If no assignee is mentioned, use "Unassigned". If no action items exist in the transcript, return an empty array [].
 
-Respond ONLY with a valid JSON object matching this exact schema:
+Respond ONLY with a valid JSON object matching this schema:
 {
-  "overview": "3-5 concise, highly logical sentences synthesizing the meeting's primary objective, operational context, core arguments analyzed, and ultimate takeaway.",
-  "key_points": [
-    "Key Discussion Point: In-depth substantive synthesis of topic discussed with supporting rationale or evidence",
-    "Key Discussion Point: Next significant topic analyzed with context and findings",
-    "Key Discussion Point: Additional major theme or strategic analysis from the session"
-  ],
-  "decisions": [
-    "Decision Concluded: Clear policy, technical choice, agreement, or consensus reached",
-    "Decision Concluded: Additional finalized direction or resolution"
-  ],
+  "overview": "Concise executive overview",
+  "key_points": ["Substantive discussion point 1", "Substantive discussion point 2"],
+  "decisions": ["Specific decision concluded (or leave array empty [] if none)"],
   "action_items": [
     {
-      "task": "Specific actionable deliverable with clear scope and objective",
-      "assignee": "Designated individual, role, or team responsible (infer from discussion, or 'Team')",
-      "due_date": "Target completion timeframe, deadline mentioned, or 'Upcoming'"
+      "task": "Concrete actionable deliverable",
+      "assignee": "Responsible person or organization (or 'Unassigned')",
+      "due_date": "Target timeframe if mentioned"
     }
   ]
 }
-
-STRICT QUALITY RULES:
-1. Section 1 (Executive Overview): Must be logically cohesive, high-level, and easy for an executive to read in 30 seconds.
-2. Section 2 (Key Discussion Points): Focus on the core insights and substance, not fragmented raw quotes. Provide at least 3-6 clear bullet points.
-3. Section 3 (Decisions Concluded): State specific agreements, conclusions, or finalized paths forward.
-4. Section 4 (Assigned Action Items & Deliverables): Ensure deliverables are concrete tasks with assigned owners and deadlines.
-5. Do NOT include markdown code blocks (\`\`\`json), conversational commentary, or any text outside the valid JSON object.
 
 Meeting Title: "${title}"
 Transcript:
@@ -122,28 +112,32 @@ ${transcript.slice(0, 100_000)}
 function validateSummaryData(parsed: Partial<SummaryData>): SummaryData {
   const key_points = Array.isArray(parsed.key_points) && parsed.key_points.length > 0
     ? parsed.key_points.filter((k) => typeof k === 'string' && k.trim().length > 0)
-    : ['Reviewed scheduled meeting topics, operational objectives, and project deliverables.'];
+    : [];
 
+  // Super accurate: never fabricate decisions if none exist
   const decisions = Array.isArray(parsed.decisions) && parsed.decisions.length > 0
     ? parsed.decisions.filter((d) => typeof d === 'string' && d.trim().length > 0)
-    : ['Consensus reached on key priorities and strategic roadmap.'];
+    : [];
 
   const action_items = Array.isArray(parsed.action_items) && parsed.action_items.length > 0
-    ? parsed.action_items.map((item) => ({
-        task: item.task?.trim() || 'Follow up on discussion items and deliverable milestones',
-        assignee: item.assignee?.trim() || 'Team',
-        due_date: item.due_date?.trim() || 'Upcoming'
-      }))
-    : [
-        {
-          task: 'Coordinate next steps and follow up on discussed milestones',
-          assignee: 'Team',
-          due_date: 'Upcoming'
-        }
-      ];
+    ? parsed.action_items
+        .filter((item) => item && typeof item.task === 'string' && item.task.trim().length > 0)
+        .map((item) => {
+          let assignee = (item.assignee || '').trim();
+          // Remove filler grammatical words wrongly parsed as names
+          if (/^(the|meanwhile|then|and|also|a|an|in|on|at|by|for|with)$/i.test(assignee)) {
+            assignee = 'Unassigned';
+          }
+          return {
+            task: item.task.trim(),
+            assignee: assignee || 'Unassigned',
+            due_date: (item.due_date || '').trim() || undefined
+          };
+        })
+    : [];
 
   return {
-    overview: parsed.overview?.trim() || 'Executive meeting overview synthesized by AI.',
+    overview: parsed.overview?.trim() || 'Summary synthesized from meeting transcript.',
     key_points,
     decisions,
     action_items
@@ -157,7 +151,7 @@ async function callGeminiSummarize(
   transcript: string,
   title: string
 ): Promise<SummaryData> {
-  const models = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-2.0-flash'];
+  const models = ['gemini-3.8-flash', 'gemini-2.5-flash'];
   const prompt = buildExecutivePrompt(transcript, title);
   let lastError = '';
 
@@ -175,7 +169,7 @@ async function callGeminiSummarize(
             }
           ],
           generationConfig: {
-            temperature: 0.2,
+            temperature: 0.1,
             responseMimeType: 'application/json'
           }
         })
@@ -204,14 +198,14 @@ async function callGeminiSummarize(
   throw new Error(`Gemini AI summarization failed: ${lastError}`);
 }
 
-// ── Groq LLaMA 3.3 70B AI Direct Call ────────────────────────────────────────
+// ── Groq Direct Call (openai/gpt-oss-120b, qwen/qwen3.8-27b) ────────────────
 
 async function callGroqSummarize(
   apiKey: string,
   transcript: string,
   title: string
 ): Promise<SummaryData> {
-  const models = ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant'];
+  const models = ['openai/gpt-oss-120b', 'qwen/qwen3.8-27b', 'openai/gpt-oss-20b'];
   const prompt = buildExecutivePrompt(transcript, title);
   let lastError = '';
 
@@ -228,7 +222,7 @@ async function callGroqSummarize(
           messages: [
             {
               role: 'system',
-              content: 'You are an elite executive chief of staff and intelligence analyst. You output ONLY valid JSON matching the requested schema.'
+              content: 'You are an elite executive intelligence analyst. You output ONLY valid JSON matching the exact schema requested. Never fabricate decisions.'
             },
             {
               role: 'user',
@@ -236,7 +230,7 @@ async function callGroqSummarize(
             }
           ],
           response_format: { type: 'json_object' },
-          temperature: 0.2
+          temperature: 0.1
         })
       });
 
@@ -344,56 +338,18 @@ async function callLocalSummarize(
 // ── Client-side Failsafe Heuristic ───────────────────────────────────────────
 
 function clientHeuristicSummarize(transcript: string, title?: string): SummaryData {
-  const lines = transcript
-    .split(/\r?\n|[.!?]+/)
+  const sentences = transcript
+    .split(/(?<=[.!?])\s+/)
     .map((s) => s.trim())
-    .filter((s) => s.length > 5);
+    .filter((s) => s.length > 25);
 
-  const actionKeywords = [
-    'will', 'need to', 'must', 'action', 'todo', 'follow up',
-    'assign', 'by tomorrow', 'by friday', 'schedule', 'review', 'please'
-  ];
-  const decisionKeywords = [
-    'decided', 'agreed', 'decision', 'concluded', 'approved', 'chosen', 'finalized', 'resolved'
-  ];
-
-  const action_items: SummaryData['action_items'] = [];
-  const decisions: string[] = [];
-  const key_points: string[] = [];
-
-  for (const line of lines) {
-    const lower = line.toLowerCase();
-
-    if (decisionKeywords.some((k) => lower.includes(k))) {
-      if (decisions.length < 8) decisions.push(line);
-    } else if (actionKeywords.some((k) => lower.includes(k))) {
-      if (action_items.length < 10) {
-        const assigneeMatch = line.match(/\b([A-Z][a-z]{2,})\b/);
-        action_items.push({
-          task: line,
-          assignee: assigneeMatch ? assigneeMatch[1] : 'Team',
-          due_date: new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString().split('T')[0]
-        });
-      }
-    } else if (key_points.length < 6 && line.length > 20) {
-      key_points.push(line);
-    }
-  }
+  const key_points = sentences.slice(0, 6);
 
   return {
-    overview: `Session "${title || 'Meeting'}" covered ${lines.length} recorded discussion segments. Key operational themes and action items were reviewed.`,
-    key_points: key_points.length > 0 ? key_points : ['Reviewed scheduled meeting topics and project deliverables.'],
-    decisions: decisions.length > 0 ? decisions : ['Agreed to proceed with scheduled deliverables and project roadmap.'],
-    action_items:
-      action_items.length > 0
-        ? action_items
-        : [
-            {
-              task: 'Follow up on discussion items and deliverable milestones',
-              assignee: 'Team Lead',
-              due_date: new Date().toISOString().split('T')[0]
-            }
-          ]
+    overview: `Session "${title || 'Meeting'}" covered ${sentences.length} recorded discussion segments regarding scheduled topics.`,
+    key_points: key_points.length > 0 ? key_points : ['Reviewed meeting discussion points.'],
+    decisions: [],
+    action_items: []
   };
 }
 
@@ -419,36 +375,36 @@ export async function summarizeMeeting(options: SummarizeOptions): Promise<Summa
   const geminiApiKey = getGeminiApiKey();
   const groqApiKey = getGroqApiKey();
 
-  // ── Tier 1A: Google Gemini AI ───────────────────────────────────────────────
+  // ── Tier 1A: Google Gemini 3.8 Flash AI ──────────────────────────────────────
   if (geminiApiKey) {
     try {
       progress('Analyzing transcript with Google Gemini AI…', 30);
       const summary = await callGeminiSummarize(geminiApiKey, transcript, title);
-      progress('Executive summary generated ✓ (Gemini)', 100);
+      progress('Executive summary generated ✓ (Gemini 3.8 Flash)', 100);
       const audioUrl = await audioUrlPromise;
       return {
         summary,
         tierUsed: 'cloud',
         audioUrl,
-        provider: 'gemini'
+        provider: 'gemini/gemini-3.8-flash'
       };
     } catch (geminiErr) {
       console.warn('[Gemini AI failed, attempting Groq fallback]:', geminiErr);
     }
   }
 
-  // ── Tier 1B: Groq LLaMA 3.3 70B AI ──────────────────────────────────────────
+  // ── Tier 1B: Groq AI (GPT-OSS-120B / Qwen 27B) ──────────────────────────────
   if (groqApiKey) {
     try {
-      progress('Analyzing transcript with Groq LLaMA 3.3 70B AI…', 40);
+      progress('Analyzing transcript with Groq AI…', 40);
       const summary = await callGroqSummarize(groqApiKey, transcript, title);
-      progress('Executive summary generated ✓ (Groq LLaMA 3.3 70B)', 100);
+      progress('Executive summary generated ✓ (Groq AI)', 100);
       const audioUrl = await audioUrlPromise;
       return {
         summary,
         tierUsed: 'cloud',
         audioUrl,
-        provider: 'groq (llama-3.3-70b)'
+        provider: 'groq/gpt-oss-120b'
       };
     } catch (groqErr) {
       console.warn('[Groq AI failed]:', groqErr);
