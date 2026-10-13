@@ -20,8 +20,7 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({
     {
       id: 'studio' as NavTab,
       label: 'Studio',
-      icon: Mic,
-      badge: isRecording ? 'REC' : undefined
+      icon: Mic
     },
     {
       id: 'vault' as NavTab,
@@ -80,23 +79,6 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({
                     filter: isActive ? 'drop-shadow(0 2px 8px var(--accent-primary-glow))' : 'none'
                   }}
                 />
-                {tab.badge && (
-                  <span style={{
-                    position: 'absolute',
-                    top: '-4px',
-                    right: '-10px',
-                    background: '#f43f5e',
-                    color: '#ffffff',
-                    fontSize: '8px',
-                    fontWeight: 800,
-                    padding: '1px 4px',
-                    borderRadius: '6px',
-                    animation: 'pulse 1.2s infinite',
-                    letterSpacing: '0.4px'
-                  }}>
-                    {tab.badge}
-                  </span>
-                )}
               </div>
               <span className="dock-label">{tab.label}</span>
             </button>
