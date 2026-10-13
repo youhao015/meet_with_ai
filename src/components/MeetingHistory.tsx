@@ -228,9 +228,16 @@ export const MeetingHistory: React.FC<MeetingHistoryProps> = ({ onSelectMeeting 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
                   <div style={{ textAlign: 'right', fontSize: '12px', color: 'var(--text-muted)' }}>
                     <div>{formatSeconds(item.duration_seconds || 0)}</div>
-                    <div style={{ color: 'var(--accent-primary)' }}>
-                      {item.summary?.action_items?.length || 0} tasks
-                    </div>
+                    {(() => {
+                      const uncheckedCount = (item.summary?.action_items || []).filter(
+                        (t) => t.status !== 'completed'
+                      ).length;
+                      return (
+                        <div style={{ color: uncheckedCount === 0 ? 'var(--text-muted)' : 'var(--accent-primary)' }}>
+                          {uncheckedCount} {uncheckedCount === 1 ? 'task' : 'tasks'}
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   {/* Open button */}
