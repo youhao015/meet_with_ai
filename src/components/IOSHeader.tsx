@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Sun, Moon, LogOut, ChevronDown, User, Radio } from 'lucide-react';
+import { Sun, Moon, LogOut, ChevronDown, User, Radio, Languages } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 
 interface IOSHeaderProps {
   title: string;
@@ -17,6 +18,7 @@ export const IOSHeader: React.FC<IOSHeaderProps> = ({
 }) => {
   const { theme, toggleTheme } = useTheme();
   const { user, logout } = useAuth();
+  const { language, toggleLanguage, t } = useLanguage();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -33,12 +35,12 @@ export const IOSHeader: React.FC<IOSHeaderProps> = ({
   const displayName = user?.user_metadata?.full_name
     || user?.user_metadata?.name
     || user?.email?.split('@')[0]
-    || 'Guest';
+    || t.header.guest;
 
   const avatarUrl = user?.user_metadata?.avatar_url;
   const initials = displayName.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase();
 
-  const todayStr = new Intl.DateTimeFormat('en-US', {
+  const todayStr = new Intl.DateTimeFormat(language === 'zh' ? 'zh-CN' : 'en-US', {
     weekday: 'short',
     month: 'short',
     day: 'numeric'
@@ -74,7 +76,7 @@ export const IOSHeader: React.FC<IOSHeaderProps> = ({
             cursor: onNewMeeting ? 'pointer' : 'default',
             userSelect: 'none'
           }}
-          title={onNewMeeting ? 'Go to Home / New Meeting' : undefined}
+          title={onNewMeeting ? t.header.newMeeting : undefined}
         >
           <div
             className="shimmering-robot-container"
@@ -130,15 +132,43 @@ export const IOSHeader: React.FC<IOSHeaderProps> = ({
                 animation: 'pulse 1s infinite'
               }} />
               <span style={{ color: '#f43f5e', fontWeight: 700, letterSpacing: '0.4px' }}>
-                REC
+                {t.header.rec}
               </span>
               <Radio size={14} color="#f43f5e" />
             </div>
           ) : null}
         </div>
 
-        {/* Right: Theme Toggle & Profile Menu */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        {/* Right: Language Switcher, Theme Toggle & Profile Menu */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {/* iOS Multilingual Switcher Widget */}
+          <button
+            id="header-language-toggle"
+            onClick={toggleLanguage}
+            className="btn-secondary"
+            style={{
+              height: '36px',
+              padding: '0 10px',
+              borderRadius: '18px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              cursor: 'pointer',
+              fontSize: '12px',
+              fontWeight: 600,
+              color: 'var(--text-primary)',
+              transition: 'all 0.2s ease',
+              userSelect: 'none'
+            }}
+            title={language === 'en' ? t.header.switchLanguageToZh : t.header.switchLanguageToEn}
+            aria-label="Switch Language / 切换语言"
+          >
+            <Languages size={15} color="var(--accent-primary)" />
+            <span style={{ letterSpacing: '0.2px' }}>
+              {language === 'en' ? 'EN' : '中文'}
+            </span>
+          </button>
+
           {/* iOS Theme Switcher */}
           <button
             onClick={toggleTheme}
@@ -153,7 +183,7 @@ export const IOSHeader: React.FC<IOSHeaderProps> = ({
               justifyContent: 'center',
               cursor: 'pointer'
             }}
-            title={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} Mode`}
+            title={theme === 'dark' ? t.header.switchThemeToLight : t.header.switchThemeToDark}
             aria-label="Toggle Theme"
           >
             {theme === 'dark' ? (
@@ -261,7 +291,7 @@ export const IOSHeader: React.FC<IOSHeaderProps> = ({
                   }}
                 >
                   <LogOut size={14} />
-                  Sign Out
+                  {t.header.signOut}
                 </button>
               </div>
             )}

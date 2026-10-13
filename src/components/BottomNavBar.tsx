@@ -1,5 +1,6 @@
 import React from 'react';
 import { Mic, FolderClock, BarChart3 } from 'lucide-react';
+import { useLanguage } from '../context/LanguageContext';
 
 export type NavTab = 'studio' | 'vault' | 'insights';
 
@@ -16,20 +17,22 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({
   isRecording = false,
   isSummarizing = false
 }) => {
+  const { t } = useLanguage();
+
   const tabs = [
     {
       id: 'studio' as NavTab,
-      label: 'Studio',
+      label: t.nav.studio,
       icon: Mic
     },
     {
       id: 'vault' as NavTab,
-      label: 'Vault',
+      label: t.nav.vault,
       icon: FolderClock
     },
     {
       id: 'insights' as NavTab,
-      label: 'Insights',
+      label: t.nav.insights,
       icon: BarChart3
     }
   ];
@@ -42,11 +45,11 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({
           const isActive = activeTab === tab.id;
           const isLocked = (isRecording || isSummarizing) && tab.id !== 'studio';
 
-          let tabTooltip = tab.label;
+          let tabTooltip: string = tab.label;
           if (isRecording && tab.id !== 'studio') {
-            tabTooltip = 'Recording in progress. Please stop recording before switching tabs.';
+            tabTooltip = t.nav.recLock;
           } else if (isSummarizing && tab.id !== 'studio') {
-            tabTooltip = 'AI is summarizing your meeting. Please wait until processing completes.';
+            tabTooltip = t.nav.summarizeLock;
           }
 
           return (

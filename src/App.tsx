@@ -7,10 +7,12 @@ import { MeetingHistory } from './components/MeetingHistory';
 import { AnalyticsWidgets } from './components/AnalyticsWidgets';
 import { AuthPage } from './components/AuthPage';
 import { useAuth } from './context/AuthContext';
+import { useLanguage } from './context/LanguageContext';
 import type { SummarizeResult } from './services/summarizer';
 import type { MeetingRecord } from './services/supabase';
 
 function AppShell() {
+  const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState<NavTab>('studio');
   const [currentSummaryResult, setCurrentSummaryResult] = useState<SummarizeResult | null>(null);
   const [currentTitle, setCurrentTitle] = useState<string>('');
@@ -78,11 +80,11 @@ function AppShell() {
   const getHeaderTitle = () => {
     switch (activeTab) {
       case 'studio':
-        return currentSummaryResult ? 'Summary View' : 'Live Studio';
+        return currentSummaryResult ? t.nav.summaryTitle : t.nav.studioTitle;
       case 'vault':
-        return vaultMeeting ? 'Meeting Details' : 'Meeting Vault';
+        return vaultMeeting ? t.nav.vaultDetailsTitle : t.nav.vaultTitle;
       case 'insights':
-        return 'Insights & Analytics';
+        return t.nav.insightsTitle;
       default:
         return 'MeetWithAI';
     }
@@ -139,7 +141,7 @@ function AppShell() {
               title={vaultMeeting.title}
               transcript={vaultMeeting.transcript}
               onBack={() => setVaultMeeting(null)}
-              backLabel="Back to Vault"
+              backLabel={t.summary.backToVault}
               onMeetingUpdated={(updatedSummary) => {
                 setVaultMeeting((prev) => prev ? { ...prev, summary: updatedSummary } : null);
               }}
@@ -191,6 +193,7 @@ function AppShell() {
 
 export function App() {
   const { user, isLoading } = useAuth();
+  const { t } = useLanguage();
 
   if (isLoading) {
     return (
@@ -216,7 +219,7 @@ export function App() {
             boxShadow: '0 8px 30px var(--accent-primary-glow)'
           }} />
           <p style={{ color: 'var(--text-muted)', fontSize: '13px', fontWeight: 500 }}>
-            Restoring session…
+            {t.auth.restoringSession}
           </p>
         </div>
       </div>

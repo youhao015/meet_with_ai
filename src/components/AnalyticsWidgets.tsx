@@ -21,8 +21,10 @@ import {
   type MeetingRecord,
   type InsightTaskRecord
 } from '../services/supabase';
+import { useLanguage } from '../context/LanguageContext';
 
 export const AnalyticsWidgets: React.FC = () => {
+  const { t, language } = useLanguage();
   const [meetings, setMeetings] = useState<MeetingRecord[]>([]);
   const [tasks, setTasks] = useState<InsightTaskRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -162,8 +164,8 @@ export const AnalyticsWidgets: React.FC = () => {
     const dayMinutes = dayMeetings.reduce((acc, m) => acc + getMeetingMinutes(m), 0);
 
     return {
-      day: d.toLocaleDateString('en-US', { weekday: 'short' }),
-      dateStr: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      day: d.toLocaleDateString(language === 'zh' ? 'zh-CN' : 'en-US', { weekday: 'short' }),
+      dateStr: d.toLocaleDateString(language === 'zh' ? 'zh-CN' : 'en-US', { month: 'short', day: 'numeric' }),
       minutes: dayMinutes,
       count: dayMeetings.length
     };
@@ -176,10 +178,10 @@ export const AnalyticsWidgets: React.FC = () => {
       {/* Page Header */}
       <div style={{ marginBottom: '24px' }}>
         <h1 className="ios-large-title" style={{ marginBottom: '6px' }}>
-          Insights &amp; Analytics
+          {t.insights.title}
         </h1>
         <p style={{ fontSize: '13.5px', color: 'var(--text-muted)' }}>
-          Overview of your session activity and dedicated deliverable tracking
+          {t.insights.subtitle}
         </p>
       </div>
 

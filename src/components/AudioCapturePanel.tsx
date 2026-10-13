@@ -20,6 +20,7 @@ import {
   cleanWhisperChunk,
   getGroqApiKey
 } from '../services/transcription';
+import { useLanguage } from '../context/LanguageContext';
 
 interface AudioCapturePanelProps {
   onSummaryGenerated: (result: SummarizeResult, meetingTitle: string, transcript: string, meetingId?: string) => void;
@@ -32,6 +33,7 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
   onRecordingStateChange,
   onSummarizingStateChange
 }) => {
+  const { t, language } = useLanguage();
   const [meetingTitle, setMeetingTitle] = useState('');
   const [hasStarted, setHasStarted] = useState(false);
   const [isSummarizing, setIsSummarizing] = useState(false);
@@ -331,14 +333,14 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
           <div style={{ flex: 1, minWidth: '280px' }}>
             <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
-              Meeting Title
+              {t.studio.meetingTitle}
             </label>
             <input
               id="meeting-title-input"
               type="text"
               value={meetingTitle}
               onChange={(e) => setMeetingTitle(e.target.value)}
-              placeholder="write a title"
+              placeholder={t.studio.titlePlaceholder}
               style={{
                 width: '100%',
                 background: 'var(--input-bg)',
@@ -411,16 +413,16 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
                   style={{ background: 'linear-gradient(135deg, #6366f1 0%, #4338ca 100%)' }}
                 >
                   <Mic size={16} />
-                  In-Room Mic
+                  {t.studio.startMic}
                 </button>
                 <button
                   id="btn-record-screen"
                   onClick={() => handleStartCapture('system')}
                   className="btn-secondary"
-                  title="Capture audio from browser tabs or system audio"
+                  title={t.studio.tabPermissionPrompt}
                 >
                   <MonitorUp size={16} />
-                  Record Meeting Audio
+                  {t.studio.startTab}
                 </button>
               </>
             ) : (
@@ -430,7 +432,7 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
                 className="btn-recording"
               >
                 <Square size={16} />
-                Stop Recording ({captureMode === 'mic' ? 'Mic' : 'Screen Audio'})
+                {t.studio.stopRecording} ({captureMode === 'mic' ? (language === 'zh' ? '麦克风' : 'Mic') : (language === 'zh' ? '系统音频' : 'Screen Audio')})
               </button>
             )}
 
@@ -439,10 +441,10 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
                 id="btn-reset-recording"
                 onClick={handleReset}
                 className="btn-secondary"
-                title="Clear current recording and start fresh"
+                title={language === 'zh' ? '清空当前录音并重新开始' : 'Clear current recording and start fresh'}
               >
                 <RotateCcw size={15} />
-                Reset
+                {language === 'zh' ? '重置' : 'Reset'}
               </button>
             )}
           </div>
@@ -461,17 +463,17 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
                 cursor: isSummarizing ? 'not-allowed' : 'pointer',
                 opacity: !transcript.trim() && !isSummarizing ? 0.55 : 1
               }}
-              title={!transcript.trim() ? 'Record speech or transcribe before generating a summary.' : undefined}
+              title={!transcript.trim() ? (language === 'zh' ? '请先录音或输入文本再生成纪要' : 'Record speech or transcribe before generating a summary.') : undefined}
             >
               {isSummarizing ? (
                 <>
                   <RefreshCw size={16} style={{ animation: 'spin 1s linear infinite' }} />
-                  Processing…
+                  {t.studio.summarizing}
                 </>
               ) : (
                 <>
                   <Sparkles size={16} />
-                  Generate Summary
+                  {t.studio.summarizeBtn}
                 </>
               )}
             </button>
@@ -617,7 +619,7 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
             <FileText size={18} color="var(--accent-primary)" />
             <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)' }}>
-              Real-Time Meeting Transcript
+              {t.studio.liveTranscript}
             </h3>
             {isRecording && (
               <span className="badge" style={{
@@ -635,18 +637,18 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
                   animation: 'pulse 1s infinite',
                   display: 'inline-block'
                 }} />
-                {isTranscribingChunk ? 'Audio Stream Active (Syncing…)' : 'Audio Stream Active'}
+                {isTranscribingChunk ? (language === 'zh' ? '音频流活跃 (转写同步中…)' : 'Audio Stream Active (Syncing…)') : (language === 'zh' ? '音频流活跃' : 'Audio Stream Active')}
               </span>
             )}
             {!isRecording && isListening && hasAudioInput && (
               <span className="badge" style={{ background: 'rgba(34, 197, 94, 0.15)', color: '#22c55e', display: 'flex', alignItems: 'center', gap: '5px' }}>
                 <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#22c55e', animation: 'pulse 1s infinite', display: 'inline-block' }} />
-                Listening
+                {language === 'zh' ? '正在倾听' : 'Listening'}
               </span>
             )}
             {!isRecording && isListening && !hasAudioInput && (
               <span className="badge" style={{ background: 'rgba(99, 102, 241, 0.15)', color: 'var(--accent-primary)' }}>
-                Live Dictation Active
+                {language === 'zh' ? '实时听写已就绪' : 'Live Dictation Active'}
               </span>
             )}
             {speechError && (
@@ -656,7 +658,7 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
             )}
           </div>
           <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-            Editable text area
+            {language === 'zh' ? '可在此直接编辑' : 'Editable text area'}
           </span>
         </div>
 
@@ -682,7 +684,7 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
               flexShrink: 0
             }} />
             <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--accent-primary)', flexShrink: 0, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-              Hearing:
+              {language === 'zh' ? '倾听中:' : 'Hearing:'}
             </span>
             <span style={{
               fontSize: '13.5px',
@@ -693,7 +695,7 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap'
             }}>
-              {interimTranscript ? `"${interimTranscript}"` : 'Listening to your voice… speak into microphone'}
+              {interimTranscript ? `"${interimTranscript}"` : (language === 'zh' ? '正在倾听您的声音… 请对着麦克风说话' : 'Listening to your voice… speak into microphone')}
             </span>
           </div>
         )}
@@ -705,8 +707,10 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
           onChange={(e) => setTranscript(e.target.value)}
           placeholder={
             isSpeechSupported
-              ? "Spoken words stream here in real-time, or you can type/paste meeting notes directly..."
-              : "Speech recognition not supported in this browser. You can type or paste meeting transcripts here for AI summarization."
+              ? t.studio.transcriptPlaceholder
+              : (language === 'zh'
+                  ? '当前浏览器不支持本地语音识别。您可以直接在此键入或粘贴会议对话内容以生成 AI 纪要。'
+                  : 'Speech recognition not supported in this browser. You can type or paste meeting transcripts here for AI summarization.')
           }
           style={{
             width: '100%',
@@ -726,7 +730,7 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
         />
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '12px', fontSize: '12px', color: 'var(--text-muted)' }}>
-          <span>Word count: {liveTranscript ? liveTranscript.split(/\s+/).filter(Boolean).length : 0} words</span>
+          <span>{language === 'zh' ? `字数统计: ${liveTranscript ? liveTranscript.split(/\s+/).filter(Boolean).length : 0} 词` : `Word count: ${liveTranscript ? liveTranscript.split(/\s+/).filter(Boolean).length : 0} words`}</span>
         </div>
       </div>
     </div>

@@ -9,12 +9,14 @@ import {
   Pause
 } from 'lucide-react';
 import { fetchMeetings, deleteMeeting, type MeetingRecord } from '../services/supabase';
+import { useLanguage } from '../context/LanguageContext';
 
 interface MeetingHistoryProps {
   onSelectMeeting: (meeting: MeetingRecord) => void;
 }
 
 export const MeetingHistory: React.FC<MeetingHistoryProps> = ({ onSelectMeeting }) => {
+  const { t, language } = useLanguage();
   const [meetings, setMeetings] = useState<MeetingRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -90,7 +92,7 @@ export const MeetingHistory: React.FC<MeetingHistoryProps> = ({ onSelectMeeting 
 
   const handleDelete = async (e: React.MouseEvent, meeting: MeetingRecord) => {
     e.stopPropagation(); // Don't open the meeting
-    if (!confirm(`Delete "${meeting.title}"? This cannot be undone.`)) return;
+    if (!confirm(language === 'zh' ? `确定要删除“${meeting.title}”吗？此操作无法撤销。` : `Delete "${meeting.title}"? This cannot be undone.`)) return;
 
     setDeletingId(meeting.id);
     try {
@@ -114,7 +116,7 @@ export const MeetingHistory: React.FC<MeetingHistoryProps> = ({ onSelectMeeting 
     if (!sec) return '—';
     const m = Math.floor(sec / 60);
     const s = sec % 60;
-    return m > 0 ? `${m}m ${s}s` : `${s}s`;
+    return m > 0 ? `${m}${t.vault.durationMin} ${s}${t.vault.durationSec}` : `${s}${t.vault.durationSec}`;
   };
 
   return (
@@ -124,10 +126,10 @@ export const MeetingHistory: React.FC<MeetingHistoryProps> = ({ onSelectMeeting 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '14px' }}>
           <div>
             <h2 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'var(--font-heading)' }}>
-              Meeting Vault
+              {t.vault.title}
             </h2>
             <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-              {meetings.length} meeting{meetings.length !== 1 ? 's' : ''}
+              {meetings.length} {language === 'zh' ? '场会议记录' : `meeting${meetings.length !== 1 ? 's' : ''}`}
             </p>
           </div>
 
@@ -145,7 +147,7 @@ export const MeetingHistory: React.FC<MeetingHistoryProps> = ({ onSelectMeeting 
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search meetings & summaries..."
+                placeholder={t.vault.searchPlaceholder}
                 aria-label="Search meetings and summaries"
                 style={{
                   background: 'transparent', border: 'none', outline: 'none',
@@ -173,18 +175,18 @@ export const MeetingHistory: React.FC<MeetingHistoryProps> = ({ onSelectMeeting 
       {isLoading ? (
         <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-muted)' }}>
           <RefreshCw size={24} className="spin" style={{ margin: '0 auto 12px', display: 'block' }} />
-          <p>Querying Supabase database…</p>
+          <p>{language === 'zh' ? '正在查询 Supabase 数据库…' : 'Querying Supabase database…'}</p>
         </div>
       ) : filteredMeetings.length === 0 ? (
         <div className="glass-panel" style={{ textAlign: 'center', padding: '60px 20px' }}>
           <Database size={36} color="#6366f1" style={{ margin: '0 auto 14px', display: 'block', opacity: 0.8 }} />
           <h3 style={{ fontSize: '17px', color: 'var(--text-primary)', marginBottom: '6px' }}>
-            {searchQuery ? 'No Matching Meetings' : 'No Saved Meetings Yet'}
+            {searchQuery ? (language === 'zh' ? '未找到匹配的会议' : 'No Matching Meetings') : (language === 'zh' ? '档案库暂无会议' : 'No Saved Meetings Yet')}
           </h3>
           <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '420px', margin: '0 auto' }}>
             {searchQuery
-              ? `No meetings match "${searchQuery}". Try a different search term.`
-              : 'Start a recording in the Studio to save your first meeting here.'}
+              ? (language === 'zh' ? `未找到与“${searchQuery}”相关的会议，请尝试其他关键词。` : `No meetings match "${searchQuery}". Try a different search term.`)
+              : t.vault.noMeetingsYet}
           </p>
         </div>
       ) : (
@@ -208,7 +210,7 @@ export const MeetingHistory: React.FC<MeetingHistoryProps> = ({ onSelectMeeting 
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px', flexWrap: 'wrap' }}>
                     <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                      {new Date(item.date || item.created_at).toLocaleDateString(undefined, { dateStyle: 'medium' })}
+                      {new Date(item.date || item.created_at).toLocaleDateString(language === 'zh' ? 'zh-CN' : 'en-US', { dateStyle: 'medium' })}
                     </span>
                   </div>
 
@@ -220,7 +222,7 @@ export const MeetingHistory: React.FC<MeetingHistoryProps> = ({ onSelectMeeting 
                     overflow: 'hidden', display: '-webkit-box',
                     WebkitLineClamp: 2, WebkitBoxOrient: 'vertical'
                   }}>
-                    {item.summary?.overview || item.transcript?.slice(0, 200) || 'No summary available.'}
+                    {item.summary?.overview || item.transcript?.slice(0, 200) || (language === 'zh' ? '暂无纪要概览' : 'No summary available.')}
                   </p>
                 </div>
 
@@ -234,7 +236,7 @@ export const MeetingHistory: React.FC<MeetingHistoryProps> = ({ onSelectMeeting 
                       ).length;
                       return (
                         <div style={{ color: uncheckedCount === 0 ? 'var(--text-muted)' : 'var(--accent-primary)' }}>
-                          {uncheckedCount} {uncheckedCount === 1 ? 'task' : 'tasks'}
+                          {uncheckedCount} {language === 'zh' ? '项待办' : (uncheckedCount === 1 ? 'task' : 'tasks')}
                         </div>
                       );
                     })()}

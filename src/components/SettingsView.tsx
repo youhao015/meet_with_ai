@@ -8,14 +8,17 @@ import {
   Trash2,
   CheckCircle2,
   Shield,
-  Smartphone
+  Smartphone,
+  Languages
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
+import { useLanguage } from '../context/LanguageContext';
 import { checkWebGPUSupport } from '../services/webllm';
 import { supabase } from '../services/supabase';
 
 export const SettingsView: React.FC = () => {
   const { theme, setTheme } = useTheme();
+  const { language, setLanguage, t } = useLanguage();
   const hasGPU = checkWebGPUSupport();
   const [gpuInfo, setGpuInfo] = useState<string>('Detecting GPU…');
   const [dbStatus, setDbStatus] = useState<'checking' | 'connected' | 'offline'>('checking');
@@ -77,10 +80,10 @@ export const SettingsView: React.FC = () => {
       {/* Header */}
       <div style={{ marginBottom: '24px' }}>
         <h1 className="ios-large-title" style={{ marginBottom: '6px' }}>
-          Settings &amp; Diagnostics
+          {t.settings.title}
         </h1>
         <p style={{ fontSize: '13.5px', color: 'var(--text-muted)' }}>
-          Configure appearance, manage WebGPU engines, and monitor PWA status
+          {t.settings.subtitle}
         </p>
       </div>
 
@@ -88,10 +91,10 @@ export const SettingsView: React.FC = () => {
         {/* Section 1: Appearance & Theme */}
         <div className="glass-panel" style={{ padding: '24px' }}>
           <h2 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '4px' }}>
-            Appearance &amp; Theme
+            {t.settings.appearanceSection}
           </h2>
           <p style={{ fontSize: '12.5px', color: 'var(--text-muted)', marginBottom: '16px' }}>
-            Choose between iOS Liquid Glass Dark mode or Apple Frost Light mode
+            {t.settings.appearanceDesc}
           </p>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
@@ -118,8 +121,8 @@ export const SettingsView: React.FC = () => {
                 <Moon size={18} color="#818cf8" />
               </div>
               <div>
-                <p style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>Dark Obsidian</p>
-                <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Deep space liquid glass</p>
+                <p style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>{t.settings.darkTheme}</p>
+                <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{t.settings.darkThemeDesc}</p>
               </div>
             </div>
 
@@ -146,20 +149,90 @@ export const SettingsView: React.FC = () => {
                 <Sun size={18} color="#d97706" />
               </div>
               <div>
-                <p style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>Light Alabaster</p>
-                <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Apple frosted glass</p>
+                <p style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>{t.settings.lightTheme}</p>
+                <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{t.settings.lightThemeDesc}</p>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Section 2: AI Engine Diagnostics */}
+        {/* Section 2: Display Language */}
         <div className="glass-panel" style={{ padding: '24px' }}>
           <h2 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '4px' }}>
-            Hardware Acceleration &amp; AI
+            {t.settings.languageSection}
           </h2>
           <p style={{ fontSize: '12.5px', color: 'var(--text-muted)', marginBottom: '16px' }}>
-            In-browser GPU inference details and fallback configuration
+            {t.settings.languageDesc}
+          </p>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
+            {/* English Option */}
+            <div
+              id="settings-lang-en"
+              onClick={() => setLanguage('en')}
+              style={{
+                padding: '16px',
+                borderRadius: '16px',
+                background: language === 'en' ? 'rgba(99, 102, 241, 0.15)' : 'var(--glass-surface-subtle)',
+                border: `2px solid ${language === 'en' ? 'var(--accent-primary)' : 'var(--glass-border)'}`,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <div style={{
+                width: '38px', height: '38px', borderRadius: '10px',
+                background: 'rgba(99, 102, 241, 0.12)', border: '1px solid rgba(99, 102, 241, 0.25)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center'
+              }}>
+                <Languages size={18} color="var(--accent-primary)" />
+              </div>
+              <div>
+                <p style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>{t.settings.langEn}</p>
+                <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{t.settings.langEnDesc}</p>
+              </div>
+            </div>
+
+            {/* Simplified Chinese Option */}
+            <div
+              id="settings-lang-zh"
+              onClick={() => setLanguage('zh')}
+              style={{
+                padding: '16px',
+                borderRadius: '16px',
+                background: language === 'zh' ? 'rgba(99, 102, 241, 0.15)' : 'var(--glass-surface-subtle)',
+                border: `2px solid ${language === 'zh' ? 'var(--accent-primary)' : 'var(--glass-border)'}`,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <div style={{
+                width: '38px', height: '38px', borderRadius: '10px',
+                background: 'rgba(168, 85, 247, 0.12)', border: '1px solid rgba(168, 85, 247, 0.25)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center'
+              }}>
+                <Languages size={18} color="var(--accent-purple)" />
+              </div>
+              <div>
+                <p style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>{t.settings.langZh}</p>
+                <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{t.settings.langZhDesc}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Section 3: AI Engine Diagnostics */}
+        <div className="glass-panel" style={{ padding: '24px' }}>
+          <h2 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '4px' }}>
+            {t.settings.aiSection}
+          </h2>
+          <p style={{ fontSize: '12.5px', color: 'var(--text-muted)', marginBottom: '16px' }}>
+            {t.settings.aiDesc}
           </p>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -219,13 +292,13 @@ export const SettingsView: React.FC = () => {
           </div>
         </div>
 
-        {/* Section 3: Cloud Database & PWA Storage */}
+        {/* Section 4: Cloud Database & PWA Storage */}
         <div className="glass-panel" style={{ padding: '24px' }}>
           <h2 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '4px' }}>
-            Storage &amp; PWA Status
+            {t.settings.storageSection}
           </h2>
           <p style={{ fontSize: '12.5px', color: 'var(--text-muted)', marginBottom: '16px' }}>
-            Supabase synchronization and offline caching management
+            {t.settings.storageDesc}
           </p>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -242,7 +315,7 @@ export const SettingsView: React.FC = () => {
                 />
                 <div>
                   <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                    Supabase PostgreSQL &amp; Storage
+                    {t.settings.supabaseStatus}
                   </p>
                   <p style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
                     RLS Secured · Audio Bucket &quot;meeting-recordings&quot;
@@ -266,7 +339,7 @@ export const SettingsView: React.FC = () => {
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <Smartphone size={20} color="var(--accent-primary)" />
                 <div>
-                  <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>PWA Service Worker</p>
+                  <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>{t.settings.pwaStatus}</p>
                   <p style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>Precached offline assets with Workbox</p>
                 </div>
               </div>
@@ -280,7 +353,7 @@ export const SettingsView: React.FC = () => {
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Shield size={16} color="var(--accent-emerald)" />
                 <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-                  Recordings remain stored in your private Supabase vault
+                  {t.settings.recordingsSafe}
                 </span>
               </div>
               <button
@@ -291,12 +364,12 @@ export const SettingsView: React.FC = () => {
                 {cacheCleared ? (
                   <>
                     <CheckCircle2 size={14} color="var(--accent-emerald)" />
-                    Cleared
+                    {t.settings.cacheCleared}
                   </>
                 ) : (
                   <>
                     <Trash2 size={14} />
-                    Clear Cache
+                    {t.settings.clearCache}
                   </>
                 )}
               </button>

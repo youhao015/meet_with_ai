@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import type { SummarizeResult } from '../services/summarizer';
 import { fetchActionItems, updateMeetingActionItems } from '../services/supabase';
+import { useLanguage } from '../context/LanguageContext';
 
 interface ActionItemWithStatus {
   task: string;
@@ -35,9 +36,11 @@ export const MeetingSummaryView: React.FC<MeetingSummaryViewProps> = ({
   title,
   transcript,
   onBack,
-  backLabel = 'Back to Studio',
+  backLabel,
   onMeetingUpdated
 }) => {
+  const { t, language } = useLanguage();
+  const effectiveBackLabel = backLabel || t.summary.backToStudio;
   const [copied, setCopied] = useState(false);
   const [actionItems, setActionItems] = useState<ActionItemWithStatus[]>(() => {
     const initial = result.summary.action_items || [];
@@ -167,12 +170,12 @@ ${transcript ? `\n## Transcript\n${transcript}\n` : ''}`;
       <div className="summary-topbar" style={{ justifyContent: 'space-between', marginBottom: '20px' }}>
         <button onClick={onBack} className="btn-secondary" style={{ padding: '8px 14px', fontSize: '13px' }}>
           <ArrowLeft size={16} />
-          {backLabel}
+          {effectiveBackLabel}
         </button>
 
         <button onClick={copyToClipboard} className="btn-primary" style={{ padding: '8px 14px', fontSize: '13px' }}>
           {copied ? <Check size={16} color="#10b981" /> : <Copy size={16} />}
-          {copied ? 'Copied Summary' : 'Copy Summary'}
+          {copied ? t.summary.copied : t.summary.copyMarkdown}
         </button>
       </div>
 
@@ -191,7 +194,7 @@ ${transcript ? `\n## Transcript\n${transcript}\n` : ''}`;
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
           <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 500 }}>
-            {new Date().toLocaleDateString(undefined, { dateStyle: 'medium' })}
+            {new Date().toLocaleDateString(language === 'zh' ? 'zh-CN' : 'en-US', { dateStyle: 'medium' })}
           </span>
         </div>
 
@@ -215,9 +218,9 @@ ${transcript ? `\n## Transcript\n${transcript}\n` : ''}`;
           color: 'var(--text-primary)'
         }}>
           <strong style={{ color: 'var(--accent-primary)', display: 'block', marginBottom: '6px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
-            Executive Overview
+            {t.summary.overview}
           </strong>
-          {result.summary.overview || 'Meeting completed with action items recorded.'}
+          {result.summary.overview || (language === 'zh' ? '会议已完成，行动项已归档。' : 'Meeting completed with action items recorded.')}
         </div>
       </div>
 
@@ -228,7 +231,7 @@ ${transcript ? `\n## Transcript\n${transcript}\n` : ''}`;
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
             <FileText size={18} color="var(--accent-primary)" />
             <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)' }}>
-              Key Discussion Points
+              {t.summary.keyPoints}
             </h3>
           </div>
           <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -246,12 +249,12 @@ ${transcript ? `\n## Transcript\n${transcript}\n` : ''}`;
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
             <CheckCircle2 size={18} color="var(--accent-emerald)" />
             <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)' }}>
-              Decisions Concluded
+              {t.summary.decisions}
             </h3>
           </div>
           {(!result.summary.decisions || result.summary.decisions.length === 0) ? (
             <p style={{ fontSize: '14px', color: 'var(--text-muted)' }}>
-              No explicit decisions concluded in this session.
+              {t.summary.noDecisions}
             </p>
           ) : (
             <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -282,12 +285,12 @@ ${transcript ? `\n## Transcript\n${transcript}\n` : ''}`;
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '18px' }}>
           <ListTodo size={18} color="var(--accent-purple)" />
           <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)' }}>
-            Assigned Action Items & Deliverables ({actionItems.length})
+            {t.summary.actionItems} ({actionItems.length})
           </h3>
         </div>
 
         {actionItems.length === 0 ? (
-          <p style={{ fontSize: '14px', color: 'var(--text-muted)' }}>No explicit action items detected in this meeting.</p>
+          <p style={{ fontSize: '14px', color: 'var(--text-muted)' }}>{t.summary.noActionItems}</p>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {actionItems.map((item, idx) => {
