@@ -1,8 +1,8 @@
-import { Cpu, Cloud, RefreshCw, AlertCircle } from 'lucide-react';
+import { RefreshCw, AlertCircle } from 'lucide-react';
 
 interface PipelineStatusProps {
   isActive: boolean;
-  progressText: string;
+  progressText?: string;
   progressPercent: number;
   streamingTokens?: string;
   tier: 'cloud' | 'local-webgpu' | 'heuristic' | null;
@@ -11,7 +11,6 @@ interface PipelineStatusProps {
 
 export function PipelineStatus({
   isActive,
-  progressText,
   progressPercent,
   streamingTokens,
   tier,
@@ -43,72 +42,47 @@ export function PipelineStatus({
   // ── Active pipeline state ──────────────────────────────────────────
   const isCloud = tier === 'cloud';
   const isLocal = tier === 'local-webgpu';
-
   const tierColor = isCloud ? '#38bdf8' : isLocal ? '#818cf8' : '#94a3b8';
-  const tierBg = isCloud ? 'rgba(56, 189, 248, 0.12)' : isLocal ? 'rgba(99, 102, 241, 0.12)' : 'rgba(148, 163, 184, 0.08)';
-  const tierBorder = isCloud ? 'rgba(56, 189, 248, 0.3)' : isLocal ? 'rgba(99, 102, 241, 0.3)' : 'rgba(148, 163, 184, 0.2)';
 
   return (
     <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-      {/* Status Row */}
+      {/* Progress Row */}
       <div style={{
-        padding: '12px 16px',
-        borderRadius: '10px',
-        background: tierBg,
-        border: `1px solid ${tierBorder}`,
+        padding: '12px 18px',
+        borderRadius: '12px',
+        background: 'var(--glass-surface-subtle)',
+        border: '1px solid var(--glass-border)',
         display: 'flex',
-        alignItems: 'center',
-        gap: '10px'
+        flexDirection: 'column',
+        gap: '8px'
       }}>
-        {/* Tier Icon */}
-        {tier ? (
-          isCloud ? (
-            <Cloud size={16} color={tierColor} style={{ flexShrink: 0, animation: 'pulse-soft 2s ease-in-out infinite' }} />
-          ) : (
-            <Cpu size={16} color={tierColor} style={{ flexShrink: 0, animation: 'pulse-soft 2s ease-in-out infinite' }} />
-          )
-        ) : (
-          <RefreshCw size={16} color={tierColor} style={{ flexShrink: 0, animation: 'spin 1.2s linear infinite' }} />
-        )}
-
-        <div style={{ flex: 1, minWidth: 0 }}>
-          {/* Label */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: progressPercent > 0 ? '8px' : 0 }}>
-            <span style={{ fontSize: '13px', color: 'var(--text-primary)', fontWeight: 500 }}>
-              {progressText || (isCloud ? 'Calling cloud AI (OpenRouter)…' : isLocal ? 'Running local WebGPU AI…' : 'Initializing AI pipeline…')}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <RefreshCw size={14} color="var(--accent-primary)" style={{ animation: 'spin 1.2s linear infinite' }} />
+            <span style={{ fontSize: '13px', color: 'var(--text-primary)', fontWeight: 600 }}>
+              Processing…
             </span>
-            {tier && (
-              <span style={{
-                fontSize: '11px',
-                fontWeight: 700,
-                textTransform: 'uppercase',
-                letterSpacing: '0.6px',
-                color: tierColor,
-                flexShrink: 0,
-                marginLeft: '10px'
-              }}>
-                {isCloud ? 'Cloud AI' : isLocal ? 'Local WebGPU' : 'Heuristic'}
-              </span>
-            )}
           </div>
+          <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 600 }}>
+            {Math.round(Math.max(0, Math.min(100, progressPercent || 0)))}%
+          </span>
+        </div>
 
-          {/* Progress bar */}
-          {progressPercent > 0 && (
-            <div style={{
-              height: '4px',
-              background: 'rgba(255,255,255,0.08)',
-              borderRadius: '2px',
-              overflow: 'hidden'
-            }}>
-              <div style={{
-                height: '100%',
-                width: `${Math.min(100, progressPercent)}%`,
-                background: `linear-gradient(90deg, ${tierColor}, ${isLocal ? '#c084fc' : '#a5f3fc'})`,
-                borderRadius: '2px',
-                transition: 'width 0.4s ease'
-              }} />
-            </div>
-          )}
+        {/* 0 to 100% Bar */}
+        <div style={{
+          height: '6px',
+          background: 'rgba(255, 255, 255, 0.08)',
+          borderRadius: '999px',
+          overflow: 'hidden',
+          width: '100%'
+        }}>
+          <div style={{
+            height: '100%',
+            width: `${Math.max(2, Math.min(100, progressPercent || 0))}%`,
+            background: 'linear-gradient(90deg, #6366f1 0%, #a855f7 100%)',
+            borderRadius: '999px',
+            transition: 'width 0.3s ease'
+          }} />
         </div>
       </div>
 
