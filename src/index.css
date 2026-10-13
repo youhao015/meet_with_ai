@@ -154,6 +154,55 @@ body {
   overflow-x: hidden;
 }
 
+button, input, textarea {
+  font: inherit;
+}
+
+button:focus-visible, input:focus-visible, textarea:focus-visible, [role="button"]:focus-visible {
+  outline: 3px solid var(--accent-cyan);
+  outline-offset: 3px;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+.page-container {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 24px 20px;
+  width: 100%;
+}
+
+.capture-actions,
+.vault-controls,
+.summary-topbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+@media (max-width: 640px) {
+  html { font-size: 14px; }
+  .page-container { padding: 16px 14px; }
+  .ios-dock-container { bottom: calc(8px + env(safe-area-inset-bottom, 0px)); padding: 0 8px; }
+  .ios-dock { width: 100%; justify-content: space-between; gap: 2px; padding: 5px; }
+  .ios-dock-tab { min-width: 0; flex: 1; padding: 8px 6px; }
+  .capture-actions, .vault-controls, .summary-topbar { width: 100%; }
+  .vault-controls { flex-wrap: wrap; }
+  .vault-controls > div { flex: 1 1 220px; }
+  .vault-controls input { width: 100% !important; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 #root {
   min-height: 100vh;
   display: flex;

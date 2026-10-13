@@ -1,7 +1,7 @@
 import React from 'react';
-import { Mic, FolderClock, BarChart3, Settings2 } from 'lucide-react';
+import { Mic, FolderClock, BarChart3 } from 'lucide-react';
 
-export type NavTab = 'studio' | 'vault' | 'insights' | 'settings';
+export type NavTab = 'studio' | 'vault' | 'insights';
 
 interface BottomNavBarProps {
   activeTab: NavTab;
@@ -32,11 +32,6 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({
       id: 'insights' as NavTab,
       label: 'Insights',
       icon: BarChart3
-    },
-    {
-      id: 'settings' as NavTab,
-      label: 'Settings',
-      icon: Settings2
     }
   ];
 

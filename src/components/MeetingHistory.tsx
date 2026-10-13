@@ -6,9 +6,7 @@ import {
   RefreshCw,
   Trash2,
   Play,
-  Pause,
-  Cpu,
-  Cloud
+  Pause
 } from 'lucide-react';
 import { fetchMeetings, deleteMeeting, type MeetingRecord } from '../services/supabase';
 
@@ -85,7 +83,7 @@ export const MeetingHistory: React.FC<MeetingHistoryProps> = ({ onSelectMeeting 
   };
 
   return (
-    <div style={{ maxWidth: '960px', margin: '0 auto', padding: '24px 20px', width: '100%' }}>
+    <div className="page-container">
       {/* Search & Header */}
       <div className="glass-panel" style={{ padding: '20px 24px', marginBottom: '24px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '14px' }}>
@@ -94,11 +92,11 @@ export const MeetingHistory: React.FC<MeetingHistoryProps> = ({ onSelectMeeting 
               Meeting Vault
             </h2>
             <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-              Synced with Supabase PostgreSQL · {meetings.length} record{meetings.length !== 1 ? 's' : ''}
+              {meetings.length} meeting{meetings.length !== 1 ? 's' : ''}
             </p>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div className="vault-controls">
             {/* Search box */}
             <div style={{
               display: 'flex', alignItems: 'center', gap: '8px',
@@ -113,6 +111,7 @@ export const MeetingHistory: React.FC<MeetingHistoryProps> = ({ onSelectMeeting 
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search meetings & summaries..."
+                aria-label="Search meetings and summaries"
                 style={{
                   background: 'transparent', border: 'none', outline: 'none',
                   color: 'var(--text-primary)', fontSize: '13px', width: '220px'
@@ -127,6 +126,7 @@ export const MeetingHistory: React.FC<MeetingHistoryProps> = ({ onSelectMeeting 
               className="btn-secondary"
               style={{ padding: '8px 12px' }}
               title="Refresh from Supabase"
+              aria-label="Refresh meeting vault"
             >
               <RefreshCw size={14} className={isLoading ? 'spin' : ''} />
             </button>
@@ -149,7 +149,7 @@ export const MeetingHistory: React.FC<MeetingHistoryProps> = ({ onSelectMeeting 
           <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '420px', margin: '0 auto' }}>
             {searchQuery
               ? `No meetings match "${searchQuery}". Try a different search term.`
-              : 'Start a live recording in the Studio — AI-summarized meetings will appear here, synced with Supabase.'}
+              : 'Start a recording in the Studio to save your first meeting here.'}
           </p>
         </div>
       ) : (
@@ -171,20 +171,7 @@ export const MeetingHistory: React.FC<MeetingHistoryProps> = ({ onSelectMeeting 
                   style={{ flex: 1, minWidth: '260px', cursor: 'pointer' }}
                   onClick={() => onSelectMeeting(item)}
                 >
-                  {/* Badges row */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px', flexWrap: 'wrap' }}>
-                    <span className="badge badge-source" style={{ textTransform: 'uppercase', fontSize: '10px' }}>
-                      {item.source}
-                    </span>
-                    {/* AI Tier badge */}
-                    {item.summary?.overview && (
-                      <span className={`badge ${item.source === 'live' ? 'badge-webgpu' : 'badge-server'}`} style={{ fontSize: '10px' }}>
-                        {item.source === 'live'
-                          ? <><Cpu size={10} /> Local AI</>
-                          : <><Cloud size={10} /> Cloud AI</>
-                        }
-                      </span>
-                    )}
                     <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
                       {new Date(item.date || item.created_at).toLocaleDateString(undefined, { dateStyle: 'medium' })}
                     </span>

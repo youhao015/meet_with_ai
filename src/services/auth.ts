@@ -1,10 +1,11 @@
 import { supabase } from './supabase';
-import type { User } from '@supabase/supabase-js';
+import type { Session, User } from '@supabase/supabase-js';
 
 export type AuthUser = Pick<User, 'id' | 'email' | 'user_metadata'>;
 
 export interface AuthResult {
   user: AuthUser | null;
+  session?: Session | null;
   error: string | null;
 }
 
@@ -25,7 +26,6 @@ export async function signUpWithEmail(
 
   if (error) return { user: null, error: error.message };
 
-  // Insert profile row (trigger also does this, belt-and-suspenders)
   if (data.user) {
     await supabase.from('profiles').upsert({
       id: data.user.id,
@@ -34,7 +34,7 @@ export async function signUpWithEmail(
     }).select();
   }
 
-  return { user: data.user, error: null };
+  return { user: data.user, session: data.session, error: null };
 }
 
 /** Sign in with email & password */

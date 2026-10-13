@@ -31,10 +31,14 @@ export function AuthPage() {
       } else if (mode === 'signup') {
         if (!fullName.trim()) { setError('Please enter your full name.'); setIsLoading(false); return; }
         if (password.length < 8) { setError('Password must be at least 8 characters.'); setIsLoading(false); return; }
-        const { error } = await signUpWithEmail(email, password, fullName.trim());
+        const { error, session } = await signUpWithEmail(email, password, fullName.trim());
         if (error) {
-          setError(error);
-        } else {
+          if (error.toLowerCase().includes('rate limit')) {
+            setError('Supabase email rate limit exceeded (default limit is 3-4 emails/hour). To fix this permanently, disable "Confirm email" under Authentication > Providers > Email in your Supabase dashboard.');
+          } else {
+            setError(error);
+          }
+        } else if (!session) {
           setSuccess('Account created! Check your email to confirm, then sign in.');
           setMode('login');
         }
@@ -76,7 +80,7 @@ export function AuthPage() {
             MeetWith<span className="gradient-text">AI</span>
           </span>
           <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '2px 0 0' }}>
-            Zero-Cost WebGPU Meeting Assistant
+            Meet with AI, enrich your mind
           </p>
         </div>
       </div>
@@ -92,7 +96,7 @@ export function AuthPage() {
             {mode === 'login'
               ? 'Sign in to access your meeting vault and AI studio.'
               : mode === 'signup'
-              ? 'Free forever — powered by your GPU or our cloud fallback.'
+              ? 'Meet with AI, enrich your mind.'
               : 'Enter your email and we\'ll send a reset link.'}
           </p>
         </div>

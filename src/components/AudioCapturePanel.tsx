@@ -37,6 +37,7 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [activeTier, setActiveTier] = useState<'cloud' | 'local-webgpu' | 'heuristic' | null>(null);
   const [isTranscribing, setIsTranscribing] = useState(false);
+  const [showCaptureHelp, setShowCaptureHelp] = useState(false);
 
   const {
     isListening,
@@ -216,7 +217,7 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
   };
 
   return (
-    <div style={{ maxWidth: '960px', margin: '0 auto', padding: '24px 20px', width: '100%' }}>
+    <div className="page-container">
 
       {/* Top Header Card */}
       <div className="glass-panel" style={{ padding: '24px 28px', marginBottom: '24px' }}>
@@ -289,7 +290,7 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
           paddingTop: '20px',
           borderTop: '1px solid var(--border-subtle)'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          <div className="capture-actions" style={{ flexWrap: 'wrap' }}>
             {!isRecording ? (
               <>
                 <button
@@ -299,7 +300,7 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
                   style={{ background: 'linear-gradient(135deg, #6366f1 0%, #4338ca 100%)' }}
                 >
                   <Mic size={16} />
-                  Record In-Room Mic
+                  In-Room Mic
                 </button>
                 <button
                   id="btn-record-screen"
@@ -308,7 +309,7 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
                   title="Capture audio from browser tabs or system audio"
                 >
                   <MonitorUp size={16} />
-                  Record Screen / Tab Audio
+                  Record Meeting Audio
                 </button>
               </>
             ) : (
@@ -339,15 +340,16 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
           <button
             id="btn-generate-summary"
             onClick={handleSummarize}
-            disabled={isSummarizing}
+            disabled={isSummarizing || !transcript.trim()}
             className="btn-primary"
             style={{
               background: isSummarizing
                 ? 'rgba(99, 102, 241, 0.4)'
                 : 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)',
               cursor: isSummarizing ? 'not-allowed' : 'pointer',
-              opacity: !transcript.trim() && !isSummarizing ? 0.75 : 1
+              opacity: !transcript.trim() && !isSummarizing ? 0.55 : 1
             }}
+            title={!transcript.trim() ? 'Record, transcribe, or paste notes before generating a summary.' : undefined}
           >
             {isSummarizing ? (
               <>
@@ -379,10 +381,27 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
             lineHeight: 1.5
           }}>
             <span style={{ fontSize: '16px' }}>🎧</span>
-            <span>
-              <strong>Attending a meeting with earphones?</strong> Click <strong>Record Screen / Tab Audio</strong> (select your meeting tab and check <em>"Also share tab audio"</em>). In-Room Mic only hears room air, so it cannot hear voices inside your earphones.
+            <span style={{ flex: 1 }}>
+              <strong>For Zoom, Meet, or Teams:</strong> choose <strong>Record Meeting Audio</strong>, select the meeting tab, and enable tab audio.
             </span>
+            <button
+              type="button"
+              onClick={() => setShowCaptureHelp((value) => !value)}
+              aria-expanded={showCaptureHelp}
+              className="btn-secondary"
+              style={{ padding: '5px 9px', fontSize: '11.5px', flexShrink: 0 }}
+            >
+              {showCaptureHelp ? 'Hide steps' : 'How it works'}
+            </button>
           </div>
+        )}
+
+        {!isRecording && showCaptureHelp && (
+          <ol style={{ margin: '10px 0 0 20px', color: 'var(--text-secondary)', fontSize: '12.5px', lineHeight: 1.7 }}>
+            <li>Use <strong>Record Meeting Audio</strong> for calls in your browser.</li>
+            <li>In the share dialog, choose the meeting tab and turn on its audio.</li>
+            <li>Stop the recording, transcribe it if needed, then generate your summary.</li>
+          </ol>
         )}
 
         {/* Tab/Screen Audio Guidance Notice when recording system audio */}
@@ -559,6 +578,7 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
 
         <textarea
           id="transcript-textarea"
+          aria-label="Meeting transcript or notes"
           value={transcript}
           onChange={(e) => setTranscript(e.target.value)}
           placeholder={

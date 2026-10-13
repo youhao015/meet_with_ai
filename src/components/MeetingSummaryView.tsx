@@ -23,13 +23,15 @@ interface MeetingSummaryViewProps {
   title: string;
   transcript: string;
   onBack: () => void;
+  backLabel?: string;
 }
 
 export const MeetingSummaryView: React.FC<MeetingSummaryViewProps> = ({
   result,
   title,
   transcript,
-  onBack
+  onBack,
+  backLabel = 'Back to Studio'
 }) => {
   const [copied, setCopied] = useState(false);
   const [actionItems, setActionItems] = useState<ActionItemWithStatus[]>(result.summary.action_items || []);
@@ -69,12 +71,12 @@ ${transcript ? `\n## Transcript\n${transcript}\n` : ''}`;
   };
 
   return (
-    <div style={{ maxWidth: '960px', margin: '0 auto', padding: '24px 20px', width: '100%' }}>
+    <div className="page-container">
       {/* Top Bar Navigation */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+      <div className="summary-topbar" style={{ justifyContent: 'space-between', marginBottom: '20px' }}>
         <button onClick={onBack} className="btn-secondary" style={{ padding: '8px 14px', fontSize: '13px' }}>
           <ArrowLeft size={16} />
-          Back to Studio
+          {backLabel}
         </button>
 
         <button onClick={copyToClipboard} className="btn-primary" style={{ padding: '8px 14px', fontSize: '13px' }}>

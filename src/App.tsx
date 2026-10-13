@@ -5,7 +5,6 @@ import { AudioCapturePanel } from './components/AudioCapturePanel';
 import { MeetingSummaryView } from './components/MeetingSummaryView';
 import { MeetingHistory } from './components/MeetingHistory';
 import { AnalyticsWidgets } from './components/AnalyticsWidgets';
-import { SettingsView } from './components/SettingsView';
 import { AuthPage } from './components/AuthPage';
 import { useAuth } from './context/AuthContext';
 import type { SummarizeResult } from './services/summarizer';
@@ -41,7 +40,6 @@ function AppShell() {
       },
       tierUsed: meeting.source === 'live' ? 'local-webgpu' : 'cloud'
     });
-    setActiveTab('studio');
   };
 
   const handleNewMeeting = () => {
@@ -59,8 +57,6 @@ function AppShell() {
         return 'Meeting Vault';
       case 'insights':
         return 'Insights & Analytics';
-      case 'settings':
-        return 'Settings & Hardware';
       default:
         return 'MeetWithAI';
     }
@@ -96,16 +92,23 @@ function AppShell() {
         )}
 
         {activeTab === 'vault' && (
-          <MeetingHistory onSelectMeeting={handleSelectHistoryMeeting} />
+          currentSummaryResult ? (
+            <MeetingSummaryView
+              result={currentSummaryResult}
+              title={currentTitle}
+              transcript={currentTranscript}
+              onBack={() => setCurrentSummaryResult(null)}
+              backLabel="Back to Vault"
+            />
+          ) : (
+            <MeetingHistory onSelectMeeting={handleSelectHistoryMeeting} />
+          )
         )}
 
         {activeTab === 'insights' && (
           <AnalyticsWidgets />
         )}
 
-        {activeTab === 'settings' && (
-          <SettingsView />
-        )}
       </main>
 
       {/* iOS Floating Bottom Glass Dock */}
