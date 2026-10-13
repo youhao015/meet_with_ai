@@ -658,8 +658,8 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
             </span>
             <span style={{ fontSize: '13.5px', color: 'var(--text-secondary)' }}>
               {isTranscribingChunk
-                ? 'Transcribing 10s audio slice with Groq Whisper…'
-                : `Recording live audio · Transcribing every 10s (~${Math.max(1, 10 - (recordingDuration % 10))}s to next sync)`}
+                ? 'Transcribing audio with Groq Whisper…'
+                : 'Recording live audio · Synced in 10-second intervals'}
             </span>
           </div>
         )}

@@ -58,6 +58,8 @@ export default defineConfig({
         ]
       },
       workbox: {
+        skipWaiting: true,
+        clientsClaim: true,
         // Allow large files — WebLLM model bundles exceed the default 2 MB limit
         maximumFileSizeToCacheInBytes: 50 * 1024 * 1024,
         globPatterns: ['**/*.{js,css,html,ico,png,svg,wasm}'],
