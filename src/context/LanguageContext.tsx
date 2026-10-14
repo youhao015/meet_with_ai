@@ -95,7 +95,12 @@ export const translations = {
       delete: 'Delete',
       tierLocal: 'Local WebGPU AI',
       tierCloud: 'Cloud Multi-Model',
-      tierHeuristic: 'Heuristic Fallback'
+      tierHeuristic: 'Heuristic Fallback',
+      editTitle: 'Edit title',
+      saveTitle: 'Save',
+      cancelEdit: 'Cancel',
+      titlePlaceholder: 'Meeting title…',
+      titleUpdated: 'Title updated'
     },
 
     // Meeting Vault (History)
@@ -311,7 +316,12 @@ export const translations = {
       delete: '删除',
       tierLocal: '本地 WebGPU AI',
       tierCloud: '云端多模型引擎',
-      tierHeuristic: '启发式备用规则'
+      tierHeuristic: '启发式备用规则',
+      editTitle: '修改标题',
+      saveTitle: '保存',
+      cancelEdit: '取消',
+      titlePlaceholder: '输入会议标题…',
+      titleUpdated: '标题已更新'
     },
 
     // Meeting Vault (History)

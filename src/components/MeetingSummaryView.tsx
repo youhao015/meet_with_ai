@@ -7,10 +7,12 @@ import {
   Check,
   ArrowLeft,
   Calendar,
-  User
+  User,
+  Pencil,
+  X
 } from 'lucide-react';
 import type { SummarizeResult } from '../services/summarizer';
-import { fetchActionItems, updateMeetingActionItems } from '../services/supabase';
+import { fetchActionItems, updateMeetingActionItems, updateMeetingTitle } from '../services/supabase';
 import { useLanguage } from '../context/LanguageContext';
 
 interface ActionItemWithStatus {
@@ -28,6 +30,7 @@ interface MeetingSummaryViewProps {
   onBack: () => void;
   backLabel?: string;
   onMeetingUpdated?: (updatedSummary: SummarizeResult['summary']) => void;
+  onTitleUpdated?: (newTitle: string) => void;
 }
 
 export const MeetingSummaryView: React.FC<MeetingSummaryViewProps> = ({
@@ -37,11 +40,46 @@ export const MeetingSummaryView: React.FC<MeetingSummaryViewProps> = ({
   transcript,
   onBack,
   backLabel,
-  onMeetingUpdated
+  onMeetingUpdated,
+  onTitleUpdated
 }) => {
   const { t, language } = useLanguage();
   const effectiveBackLabel = backLabel || t.summary.backToStudio;
   const [copied, setCopied] = useState(false);
+
+  // Title editing state
+  const [currentTitle, setCurrentTitle] = useState(title);
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [editedTitle, setEditedTitle] = useState(title);
+  const [isSavingTitle, setIsSavingTitle] = useState(false);
+
+  useEffect(() => {
+    setCurrentTitle(title);
+    setEditedTitle(title);
+  }, [title]);
+
+  const handleSaveTitle = async () => {
+    const trimmed = editedTitle.trim();
+    if (!trimmed) return;
+    if (trimmed === currentTitle) {
+      setIsEditingTitle(false);
+      return;
+    }
+
+    setIsSavingTitle(true);
+    try {
+      if (meetingId) {
+        await updateMeetingTitle(meetingId, trimmed);
+      }
+      setCurrentTitle(trimmed);
+      onTitleUpdated?.(trimmed);
+      setIsEditingTitle(false);
+    } catch (err) {
+      console.error('[MeetingSummaryView] Error saving title:', err);
+    } finally {
+      setIsSavingTitle(false);
+    }
+  };
   const [actionItems, setActionItems] = useState<ActionItemWithStatus[]>(() => {
     const initial = result.summary.action_items || [];
     if (meetingId) {
@@ -144,7 +182,7 @@ export const MeetingSummaryView: React.FC<MeetingSummaryViewProps> = ({
   };
 
   const copyToClipboard = () => {
-    const markdown = `# Meeting Summary: ${title}
+    const markdown = `# Meeting Summary: ${currentTitle}
 Generated via MeetWithAI
 
 ## Executive Overview
@@ -198,15 +236,133 @@ ${transcript ? `\n## Transcript\n${transcript}\n` : ''}`;
           </span>
         </div>
 
-        <h1 style={{
-          fontFamily: 'var(--font-heading)',
-          fontSize: '28px',
-          fontWeight: 700,
-          color: 'var(--text-primary)',
-          marginBottom: '12px'
-        }}>
-          {title}
-        </h1>
+        {/* Editable Title Header */}
+        {isEditingTitle ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px', flexWrap: 'wrap' }}>
+            <input
+              type="text"
+              value={editedTitle}
+              onChange={(e) => setEditedTitle(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleSaveTitle();
+                if (e.key === 'Escape') {
+                  setIsEditingTitle(false);
+                  setEditedTitle(currentTitle);
+                }
+              }}
+              autoFocus
+              disabled={isSavingTitle}
+              placeholder={t.summary.titlePlaceholder}
+              style={{
+                fontFamily: 'var(--font-heading)',
+                fontSize: '24px',
+                fontWeight: 700,
+                color: 'var(--text-primary)',
+                background: 'var(--input-bg)',
+                border: '1.5px solid var(--accent-primary)',
+                borderRadius: '12px',
+                padding: '6px 14px',
+                outline: 'none',
+                flex: '1 1 300px',
+                minWidth: '220px',
+                boxShadow: '0 0 0 3px rgba(99, 102, 241, 0.2)'
+              }}
+            />
+            <button
+              type="button"
+              onClick={handleSaveTitle}
+              disabled={isSavingTitle || !editedTitle.trim()}
+              className="btn-primary"
+              style={{
+                padding: '8px 14px',
+                fontSize: '13px',
+                borderRadius: '10px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                cursor: isSavingTitle ? 'not-allowed' : 'pointer'
+              }}
+              title={t.summary.saveTitle}
+            >
+              <Check size={16} />
+              <span>{isSavingTitle ? '…' : t.summary.saveTitle}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setIsEditingTitle(false);
+                setEditedTitle(currentTitle);
+              }}
+              disabled={isSavingTitle}
+              className="btn-secondary"
+              style={{
+                padding: '8px 14px',
+                fontSize: '13px',
+                borderRadius: '10px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+              title={t.summary.cancelEdit}
+            >
+              <X size={16} />
+              <span>{t.summary.cancelEdit}</span>
+            </button>
+          </div>
+        ) : (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            marginBottom: '14px',
+            flexWrap: 'wrap'
+          }}>
+            <h1
+              onClick={() => {
+                setEditedTitle(currentTitle);
+                setIsEditingTitle(true);
+              }}
+              style={{
+                fontFamily: 'var(--font-heading)',
+                fontSize: '28px',
+                fontWeight: 700,
+                color: 'var(--text-primary)',
+                margin: 0,
+                lineHeight: 1.25,
+                cursor: 'pointer'
+              }}
+              title={t.summary.editTitle}
+            >
+              {currentTitle || (language === 'zh' ? '未命名会议' : 'Untitled Meeting')}
+            </h1>
+            <button
+              type="button"
+              onClick={() => {
+                setEditedTitle(currentTitle);
+                setIsEditingTitle(true);
+              }}
+              style={{
+                background: 'rgba(99, 102, 241, 0.1)',
+                border: '1px solid rgba(99, 102, 241, 0.25)',
+                borderRadius: '8px',
+                padding: '5px 10px',
+                cursor: 'pointer',
+                color: 'var(--accent-primary)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                fontSize: '12px',
+                fontWeight: 600,
+                transition: 'all 0.18s ease'
+              }}
+              title={t.summary.editTitle}
+              aria-label={t.summary.editTitle}
+            >
+              <Pencil size={13} />
+              <span>{t.summary.editTitle}</span>
+            </button>
+          </div>
+        )}
 
         <div style={{
           background: 'var(--glass-surface-subtle)',

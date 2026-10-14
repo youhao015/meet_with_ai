@@ -138,6 +138,48 @@ export async function deleteMeeting(meetingId: string, audioUrl?: string): Promi
   return true;
 }
 
+/** Update the title of a meeting in the database */
+export async function updateMeetingTitle(meetingId: string, newTitle: string): Promise<boolean> {
+  const trimmedTitle = newTitle.trim();
+  if (!trimmedTitle) return false;
+
+  try {
+    // Keep title inside summary object aligned if present
+    const { data: meeting } = await supabase
+      .from('meetings')
+      .select('summary')
+      .eq('id', meetingId)
+      .single();
+
+    const updatePayload: Record<string, unknown> = {
+      title: trimmedTitle,
+      updated_at: new Date().toISOString()
+    };
+
+    if (meeting?.summary && typeof meeting.summary === 'object') {
+      updatePayload.summary = {
+        ...meeting.summary,
+        title: trimmedTitle
+      };
+    }
+
+    const { error } = await supabase
+      .from('meetings')
+      .update(updatePayload)
+      .eq('id', meetingId);
+
+    if (error) {
+      console.error('[updateMeetingTitle] Error updating title:', error.message);
+      return false;
+    }
+
+    return true;
+  } catch (err) {
+    console.error('[updateMeetingTitle] Unexpected error:', err);
+    return false;
+  }
+}
+
 /** Update a single action item's status */
 export async function updateActionItemStatus(
   actionItemId: string,

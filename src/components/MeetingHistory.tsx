@@ -6,9 +6,12 @@ import {
   RefreshCw,
   Trash2,
   Play,
-  Pause
+  Pause,
+  Pencil,
+  Check,
+  X
 } from 'lucide-react';
-import { fetchMeetings, deleteMeeting, type MeetingRecord } from '../services/supabase';
+import { fetchMeetings, deleteMeeting, updateMeetingTitle, type MeetingRecord } from '../services/supabase';
 import { useLanguage } from '../context/LanguageContext';
 
 interface MeetingHistoryProps {
@@ -22,6 +25,9 @@ export const MeetingHistory: React.FC<MeetingHistoryProps> = ({ onSelectMeeting 
   const [searchQuery, setSearchQuery] = useState('');
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [playingId, setPlayingId] = useState<string | null>(null);
+  const [editingTitleId, setEditingTitleId] = useState<string | null>(null);
+  const [editingTitleValue, setEditingTitleValue] = useState('');
+  const [isSavingTitle, setIsSavingTitle] = useState(false);
 
   const mergeLocalStorage = (list: MeetingRecord[]): MeetingRecord[] => {
     return list.map((m) => {
@@ -102,6 +108,30 @@ export const MeetingHistory: React.FC<MeetingHistoryProps> = ({ onSelectMeeting 
       }
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  const handleSaveTitle = async (e: React.MouseEvent | React.KeyboardEvent, meetingId: string) => {
+    e.stopPropagation();
+    const trimmed = editingTitleValue.trim();
+    if (!trimmed) {
+      setEditingTitleId(null);
+      return;
+    }
+
+    setIsSavingTitle(true);
+    try {
+      const ok = await updateMeetingTitle(meetingId, trimmed);
+      if (ok) {
+        setMeetings((prev) =>
+          prev.map((m) => (m.id === meetingId ? { ...m, title: trimmed } : m))
+        );
+      }
+    } catch (err) {
+      console.warn('Could not save meeting title:', err);
+    } finally {
+      setIsSavingTitle(false);
+      setEditingTitleId(null);
     }
   };
 
@@ -214,9 +244,93 @@ export const MeetingHistory: React.FC<MeetingHistoryProps> = ({ onSelectMeeting 
                     </span>
                   </div>
 
-                  <h4 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '5px' }}>
-                    {item.title}
-                  </h4>
+                  {editingTitleId === item.id ? (
+                    <div
+                      style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <input
+                        type="text"
+                        value={editingTitleValue}
+                        onChange={(e) => setEditingTitleValue(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleSaveTitle(e, item.id);
+                          if (e.key === 'Escape') {
+                            e.stopPropagation();
+                            setEditingTitleId(null);
+                          }
+                        }}
+                        autoFocus
+                        disabled={isSavingTitle}
+                        style={{
+                          fontSize: '15px',
+                          fontWeight: 600,
+                          color: 'var(--text-primary)',
+                          background: 'var(--input-bg)',
+                          border: '1.5px solid var(--accent-primary)',
+                          borderRadius: '8px',
+                          padding: '4px 10px',
+                          outline: 'none',
+                          flex: 1,
+                          maxWidth: '320px'
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={(e) => handleSaveTitle(e, item.id)}
+                        disabled={isSavingTitle}
+                        className="btn-primary"
+                        style={{ padding: '6px 10px', borderRadius: '7px' }}
+                        title={t.summary.saveTitle}
+                      >
+                        <Check size={14} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingTitleId(null);
+                        }}
+                        disabled={isSavingTitle}
+                        className="btn-secondary"
+                        style={{ padding: '6px 10px', borderRadius: '7px' }}
+                        title={t.summary.cancelEdit}
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '5px' }}>
+                      <h4 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
+                        {item.title}
+                      </h4>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingTitleId(item.id);
+                          setEditingTitleValue(item.title);
+                        }}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          padding: '3px 6px',
+                          cursor: 'pointer',
+                          color: 'var(--text-muted)',
+                          borderRadius: '6px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          transition: 'color 0.15s ease'
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--accent-primary)')}
+                        onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
+                        title={t.summary.editTitle}
+                      >
+                        <Pencil size={13} />
+                      </button>
+                    </div>
+                  )}
                   <p style={{
                     fontSize: '13px', color: 'var(--text-secondary)',
                     overflow: 'hidden', display: '-webkit-box',

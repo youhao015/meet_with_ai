@@ -113,6 +113,9 @@ function AppShell() {
                 onMeetingUpdated={(updatedSummary) => {
                   setCurrentSummaryResult((prev) => prev ? { ...prev, summary: updatedSummary } : null);
                 }}
+                onTitleUpdated={(newTitle) => {
+                  setCurrentTitle(newTitle);
+                }}
               />
             ) : (
               <AudioCapturePanel
@@ -144,6 +147,9 @@ function AppShell() {
               backLabel={t.summary.backToVault}
               onMeetingUpdated={(updatedSummary) => {
                 setVaultMeeting((prev) => prev ? { ...prev, summary: updatedSummary } : null);
+              }}
+              onTitleUpdated={(newTitle) => {
+                setVaultMeeting((prev) => prev ? { ...prev, title: newTitle } : null);
               }}
             />
           ) : (
