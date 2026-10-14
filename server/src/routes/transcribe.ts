@@ -82,12 +82,52 @@ router.post('/', upload.single('audio'), async (req: Request, res: Response) => 
       text: string;
       language?: string;
       duration?: number;
-      segments?: Array<{ id: number; start: number; end: number; text: string }>;
+      segments?: Array<{
+        id: number;
+        start: number;
+        end: number;
+        text: string;
+        no_speech_prob?: number;
+        compression_ratio?: number;
+      }>;
     };
+
+    let text = data.text?.trim() || '';
+    const segments = data.segments;
+
+    if (segments && segments.length > 0) {
+      const isCompletelySilent = segments.every((s) => (s.no_speech_prob ?? 0) > 0.65);
+      const avgNoSpeechProb = segments.reduce((sum, s) => sum + (s.no_speech_prob ?? 0), 0) / segments.length;
+
+      if (isCompletelySilent || (segments.length > 1 && avgNoSpeechProb > 0.7)) {
+        return res.json({
+          success: true,
+          text: '',
+          language: data.language,
+          duration: data.duration,
+          segments: []
+        });
+      }
+
+      const speechSegments = segments.filter((s) => (s.no_speech_prob ?? 0) <= 0.75);
+      if (speechSegments.length === 0) {
+        return res.json({
+          success: true,
+          text: '',
+          language: data.language,
+          duration: data.duration,
+          segments: []
+        });
+      }
+
+      if (speechSegments.length < segments.length) {
+        text = speechSegments.map((s) => s.text).join(' ').trim();
+      }
+    }
 
     return res.json({
       success: true,
-      text: data.text?.trim() || '',
+      text,
       language: data.language,
       duration: data.duration,
       segments: data.segments

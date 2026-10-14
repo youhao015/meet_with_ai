@@ -8,21 +8,74 @@ export interface TranscribeResponse {
   segments?: Array<{ id: number; start: number; end: number; text: string }>;
 }
 
+export function removeWhisperHallucinationLoops(text: string): string {
+  if (!text) return '';
+  let cleaned = text.trim();
+
+  // 1. Phrase loop collapse: detect repeated sequences of 2 to 8 words repeating consecutively 2+ times
+  // Example: "of the episode of the episode of the episode" -> "of the episode"
+  cleaned = cleaned.replace(/\b(\w+(?:\s+\w+){1,7})\b(?:\s+\1\b){2,}/gi, '$1');
+
+  // 2. Sentence / clause repetition collapse:
+  const parts = cleaned.split(/(?<=[.?!])\s+/);
+  if (parts.length >= 2) {
+    const uniqueParts: string[] = [];
+    const seenCount = new Map<string, number>();
+
+    for (const part of parts) {
+      const trimmed = part.trim();
+      if (!trimmed) continue;
+      const normKey = trimmed.toLowerCase().replace(/[^a-z0-9\u4e00-\u9fa5]/g, '');
+      if (!normKey) continue;
+
+      const count = seenCount.get(normKey) || 0;
+      const lastPart = uniqueParts[uniqueParts.length - 1];
+      const lastNorm = lastPart ? lastPart.toLowerCase().replace(/[^a-z0-9\u4e00-\u9fa5]/g, '') : '';
+
+      // Skip consecutive duplicates
+      if (normKey === lastNorm) {
+        continue;
+      }
+
+      // If a sentence appears 3+ times in a 10s chunk, it's a hallucination loop
+      if (count >= 2) {
+        continue;
+      }
+
+      seenCount.set(normKey, count + 1);
+      uniqueParts.push(trimmed);
+    }
+
+    cleaned = uniqueParts.join(' ');
+  }
+
+  return cleaned.trim();
+}
+
 export function cleanWhisperChunk(raw: string): string {
   let text = raw.trim();
   if (!text) return '';
 
-  // Remove bracketed or parenthesized sound tags like [Music], [Applause], (laughter), [silence]
-  text = text.replace(/\[(?:music|applause|laughter|silence|blank_audio|inaudible)\]/gi, '').trim();
-  text = text.replace(/\((?:music|applause|laughter|silence|blank_audio|inaudible)\)/gi, '').trim();
+  // Remove bracketed or parenthesized sound tags
+  text = text.replace(/\[(?:music|applause|laughter|silence|blank_audio|inaudible|cheering|noise|sound|background noise)\]/gi, '').trim();
+  text = text.replace(/\((?:music|applause|laughter|silence|blank_audio|inaudible|cheering|noise|sound|background noise)\)/gi, '').trim();
 
   if (!text || text === '.' || text === '...' || text === '!') return '';
+
+  // Collapse internal repetition loops (e.g. phrase loops caused by audio pauses)
+  text = removeWhisperHallucinationLoops(text);
+  if (!text) return '';
 
   const lower = text.toLowerCase().replace(/[.,!?;:]/g, '').trim();
   const hallucinations = new Set([
     'thank you',
+    'thank you.',
     'thanks for watching',
     'thank you for watching',
+    'thanks for watching.',
+    'thank you for watching.',
+    'thank you for listening',
+    'thanks for listening',
     'please subscribe',
     'subscribe to my channel',
     'subtitles by the amaraorg community',
@@ -30,7 +83,18 @@ export function cleanWhisperChunk(raw: string): string {
     'subtitles by',
     'you',
     'bye',
-    'goodbye'
+    'goodbye',
+    'see you next time',
+    'see you in the next video',
+    'the end',
+    'silence',
+    'blank audio',
+    'watching',
+    '谢谢大家',
+    '谢谢观看',
+    '感谢观看',
+    '请订阅',
+    '欢迎订阅'
   ]);
 
   if (hallucinations.has(lower)) {
@@ -102,9 +166,52 @@ export async function transcribeAudioWithWhisper(
     }
 
     const data = await response.json();
+    let text = data.text?.trim() || '';
+    const segments = data.segments as Array<{
+      id: number;
+      start: number;
+      end: number;
+      text: string;
+      no_speech_prob?: number;
+      compression_ratio?: number;
+    }> | undefined;
+
+    // Check silence probability from Whisper segments
+    if (segments && segments.length > 0) {
+      const isCompletelySilent = segments.every((s) => (s.no_speech_prob ?? 0) > 0.65);
+      const avgNoSpeechProb = segments.reduce((sum, s) => sum + (s.no_speech_prob ?? 0), 0) / segments.length;
+
+      if (isCompletelySilent || (segments.length > 1 && avgNoSpeechProb > 0.7)) {
+        return {
+          success: true,
+          text: '',
+          language: data.language,
+          duration: data.duration,
+          segments: []
+        };
+      }
+
+      // Filter out individual segments that are pure silence (no_speech_prob > 0.75)
+      const speechSegments = segments.filter((s) => (s.no_speech_prob ?? 0) <= 0.75);
+      if (speechSegments.length === 0) {
+        return {
+          success: true,
+          text: '',
+          language: data.language,
+          duration: data.duration,
+          segments: []
+        };
+      }
+
+      // If silence segments were pruned, update text accordingly
+      if (speechSegments.length < segments.length) {
+        text = speechSegments.map((s) => s.text).join(' ').trim();
+      }
+    }
+
     return {
       success: true,
-      text: data.text?.trim() || '',
+      text,
       language: data.language,
       duration: data.duration,
       segments: data.segments

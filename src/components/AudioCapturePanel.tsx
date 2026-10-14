@@ -28,6 +28,55 @@ interface AudioCapturePanelProps {
   onSummarizingStateChange?: (isSummarizing: boolean) => void;
 }
 
+/**
+ * Detects whether a newly transcribed chunk is an echo / duplicate of what's already at the tail
+ * of the transcript. This prevents Whisper from re-appending the last spoken sentence when
+ * subsequent audio chunks contain only silence.
+ */
+function isDuplicateOrTailEcho(currentTranscript: string, newChunk: string): boolean {
+  if (!currentTranscript || !newChunk) return false;
+
+  const normalize = (str: string) =>
+    str
+      .toLowerCase()
+      .replace(/[^\w\s\u4e00-\u9fa5]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+  const normNew = normalize(newChunk);
+  if (!normNew) return true;
+
+  const normCurrent = normalize(currentTranscript);
+  if (!normCurrent) return false;
+
+  // 1. Exact match with entire current transcript
+  if (normCurrent === normNew) return true;
+
+  // 2. Transcript already ends with this new chunk
+  if (normCurrent.endsWith(normNew)) return true;
+
+  // 3. Word-level tail comparison
+  const currentWords = normCurrent.split(' ');
+  const newWords = normNew.split(' ');
+
+  if (newWords.length >= 2) {
+    const tailWords = currentWords.slice(-newWords.length);
+    if (tailWords.join(' ') === normNew) {
+      return true;
+    }
+
+    if (newWords.length >= 4) {
+      const windowSize = Math.min(currentWords.length, newWords.length * 2);
+      const tailWindow = currentWords.slice(-windowSize).join(' ');
+      if (tailWindow.endsWith(normNew) || tailWindow.includes(normNew)) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
 export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
   onSummaryGenerated,
   onRecordingStateChange,
@@ -77,6 +126,7 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
   // Queue to ensure 10-second audio chunks are processed strictly in chronological FIFO order
   const chunkQueueRef = React.useRef<Blob[]>([]);
   const isProcessingQueueRef = React.useRef(false);
+  const lastChunkTextRef = React.useRef<string>('');
 
   const processChunkQueue = React.useCallback(async () => {
     if (isProcessingQueueRef.current) return;
@@ -86,21 +136,31 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
       const chunkBlob = chunkQueueRef.current.shift()!;
       try {
         setIsTranscribingChunk(true);
-        // Provide the trailing 150 characters to Whisper as context prompt for seamless grammatical flow
-        const currentText = transcriptRef.current.trim();
-        const prompt = currentText.length > 150 ? currentText.slice(-150) : currentText;
-
-        const response = await transcribeAudioWithWhisper(chunkBlob, {
-          prompt: prompt || undefined
-        });
+        // Important: Never pass trailing transcript as prompt to Whisper on 10s chunk slices.
+        // Whisper decoders autoregressively echo the prompt when audio chunks contain silence,
+        // causing infinite repetition loops when there is no audio input.
+        const response = await transcribeAudioWithWhisper(chunkBlob);
 
         if (response.text) {
           const cleaned = cleanWhisperChunk(response.text);
           if (cleaned) {
-            const trimmed = transcriptRef.current.trim();
-            const updated = trimmed ? `${trimmed} ${cleaned}` : cleaned;
-            transcriptRef.current = updated;
-            setTranscript(updated);
+            // Guard: check if this chunk repeats the immediate last chunk (repeating output on silence)
+            const isSameAsLastChunk =
+              Boolean(lastChunkTextRef.current) &&
+              cleaned.trim().toLowerCase() === lastChunkTextRef.current.trim().toLowerCase();
+
+            // Guard: check if this chunk echoes the tail of the current transcript
+            const isTailEcho = isDuplicateOrTailEcho(transcriptRef.current, cleaned);
+
+            if (isSameAsLastChunk || isTailEcho) {
+              console.log('[10s Whisper Chunk Sync]: Ignored silence duplicate/echo:', cleaned);
+            } else {
+              lastChunkTextRef.current = cleaned;
+              const trimmed = transcriptRef.current.trim();
+              const updated = trimmed ? `${trimmed} ${cleaned}` : cleaned;
+              transcriptRef.current = updated;
+              setTranscript(updated);
+            }
           }
         }
       } catch (err) {
@@ -184,9 +244,11 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
       setTranscribePercent(100);
 
       if (response.text && response.text.trim()) {
-        const whisperText = response.text.trim();
-        setTranscript(whisperText);
-        transcriptRef.current = whisperText;
+        const whisperText = cleanWhisperChunk(response.text);
+        if (whisperText) {
+          setTranscript(whisperText);
+          transcriptRef.current = whisperText;
+        }
       }
     } catch (err) {
       console.warn('[Auto-transcribe notice]:', err);
@@ -212,6 +274,8 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
     try {
       setHasStarted(true);
       setErrorMessage(null);
+      chunkQueueRef.current = [];
+      lastChunkTextRef.current = '';
 
       // 1. Establish audio capture
       await startRecording(mode);
@@ -244,6 +308,8 @@ export const AudioCapturePanel: React.FC<AudioCapturePanelProps> = ({
   const handleReset = () => {
     resetRecording();
     resetTranscript();
+    chunkQueueRef.current = [];
+    lastChunkTextRef.current = '';
     setHasStarted(false);
     setShowCaptureHelp(false);
     setErrorMessage(null);
