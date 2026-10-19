@@ -51,7 +51,7 @@ router.post('/', upload.single('audio'), async (req: Request, res: Response) => 
     const uint8 = new Uint8Array(file.buffer);
     const audioBlob = new Blob([uint8], { type: mimeType });
     formData.append('file', audioBlob, filename);
-    formData.append('model', 'whisper-large-v3-turbo');
+    formData.append('model', 'whisper-large-v3');
     formData.append('response_format', 'verbose_json');
     formData.append('temperature', '0');
 
@@ -59,10 +59,9 @@ router.post('/', upload.single('audio'), async (req: Request, res: Response) => 
       formData.append('language', language);
     }
 
-    const effectivePrompt =
-      prompt ||
-      'Multilingual speech with code-switching in English, Bahasa Melayu, and Chinese (中文). Transcribe verbatim in the original spoken language without translating: Hello everyone, 大家好, selamat pagi. Terima kasih, 谢谢.';
-    formData.append('prompt', effectivePrompt);
+    if (prompt) {
+      formData.append('prompt', prompt);
+    }
 
     const groqResponse = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
       method: 'POST',
