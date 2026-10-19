@@ -144,13 +144,15 @@ export async function transcribeAudioWithWhisper(
     formData.append('file', audioBlob, `meeting_recording.${extension}`);
     formData.append('model', 'whisper-large-v3-turbo');
     formData.append('response_format', 'verbose_json');
+    formData.append('temperature', '0');
 
     if (options?.language) {
       formData.append('language', options.language);
     }
-    if (options?.prompt) {
-      formData.append('prompt', options.prompt);
-    }
+    const effectivePrompt =
+      options?.prompt ||
+      'Multilingual speech with code-switching in English, Bahasa Melayu, and Chinese (中文). Transcribe verbatim in the original spoken language without translating: Hello everyone, 大家好, selamat pagi. Terima kasih, 谢谢.';
+    formData.append('prompt', effectivePrompt);
 
     const response = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
       method: 'POST',
@@ -232,7 +234,10 @@ export async function transcribeAudioWithWhisper(
     formData.append('audio', audioBlob, `meeting_recording.${extension}`);
 
     if (options?.language) formData.append('language', options.language);
-    if (options?.prompt) formData.append('prompt', options.prompt);
+    const fallbackPrompt =
+      options?.prompt ||
+      'Multilingual speech with code-switching in English, Bahasa Melayu, and Chinese (中文). Transcribe verbatim in the original spoken language without translating: Hello everyone, 大家好, selamat pagi. Terima kasih, 谢谢.';
+    formData.append('prompt', fallbackPrompt);
 
     const response = await fetch(`${API_BASE_URL}/api/transcribe`, {
       method: 'POST',
